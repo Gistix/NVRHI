@@ -130,7 +130,11 @@ namespace
 #if NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP
         void SetOMMTriangles(D3D12RaytracingGeometryDesc& triangles, D3D12_RAYTRACING_GEOMETRY_OMM_LINKAGE_DESC* linkage)
         {
+#if NVRHI_WITH_NVAPI_LSS
+            m_data.type = NVAPI_D3D12_RAYTRACING_GEOMETRY_TYPE_OMM_TRIANGLES_EX;
+#else
             m_data.type = D3D12_RAYTRACING_GEOMETRY_TYPE_OMM_TRIANGLES;
+#endif
             m_data.ommTriangles.pTriangles = &triangles.m_data.triangles;
             m_data.ommTriangles.pOmmLinkage = linkage;
         }
