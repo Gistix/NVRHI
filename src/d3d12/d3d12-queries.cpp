@@ -48,6 +48,17 @@ namespace nvrhi::d3d12
         query->resolved = false;
     }
 
+    void Device::setEventQuery(IEventQuery* _query, CommandQueue queue, uint64_t fenceCounter)
+    {
+        EventQuery* query = checked_cast<EventQuery*>(_query);
+        Queue* pQueue = getQueue(queue);
+
+        query->started = true;
+        query->fence = pQueue->fence;
+        query->fenceCounter = fenceCounter;
+        query->resolved = false;
+    }
+
     bool Device::pollEventQuery(IEventQuery* _query)
     {
         EventQuery* query = checked_cast<EventQuery*>(_query);

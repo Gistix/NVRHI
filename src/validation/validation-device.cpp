@@ -624,6 +624,11 @@ namespace nvrhi::validation
         m_Device->setEventQuery(query, queue);
     }
 
+    void DeviceWrapper::setEventQuery(IEventQuery* query, CommandQueue queue, uint64_t fenceCounter)
+    {
+        m_Device->setEventQuery(query, queue, fenceCounter);
+    }
+    
     bool DeviceWrapper::pollEventQuery(IEventQuery* query)
     {
         return m_Device->pollEventQuery(query);
