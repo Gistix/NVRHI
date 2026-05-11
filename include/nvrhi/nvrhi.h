@@ -3634,6 +3634,7 @@ namespace nvrhi
         // Event queries
         virtual EventQueryHandle createEventQuery() = 0;
         virtual void setEventQuery(IEventQuery* query, CommandQueue queue) = 0;
+        virtual void setEventQuery(IEventQuery* query, CommandQueue queue, uint64_t fenceCounter) = 0;
         virtual bool pollEventQuery(IEventQuery* query) = 0;
         virtual void waitEventQuery(IEventQuery* query) = 0;
         virtual void resetEventQuery(IEventQuery* query) = 0;

@@ -342,6 +342,7 @@ namespace nvrhi::validation
         // event queries
         EventQueryHandle createEventQuery() override;
         void setEventQuery(IEventQuery* query, CommandQueue queue) override;
+        void setEventQuery(IEventQuery* query, CommandQueue queue, uint64_t fenceCounter) override;
         bool pollEventQuery(IEventQuery* query) override;
         void waitEventQuery(IEventQuery* query) override;
         void resetEventQuery(IEventQuery* query) override;
