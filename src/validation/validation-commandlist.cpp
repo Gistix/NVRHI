@@ -1133,13 +1133,27 @@ namespace nvrhi::validation
         if (!requireType(CommandQueue::Compute, "setRayTracingState"))
             return;
 
+        bool anyErrors = false;
+
+        if (!state.shaderTable)
+        {
+            error("Ray tracing state is missing a shader table");
+            return;
+        }
+
+        if (!validateBindingSetsAgainstLayouts(state.shaderTable->getPipeline()->getDesc().globalBindingLayouts, state.bindings))
+            anyErrors = true;
+
+        if (anyErrors)
+            return;
+
         evaluatePushConstantSize(state.shaderTable->getPipeline()->getDesc().globalBindingLayouts);
 
         m_CommandList->setRayTracingState(state);
 
         m_GraphicsStateSet = false;
         m_ComputeStateSet = false;
-        m_MeshletStateSet = true;
+        m_MeshletStateSet = false;
         m_RayTracingStateSet = true;
         m_PushConstantsSet = false;
         m_CurrentRayTracingState = state;

@@ -908,6 +908,57 @@ namespace nvrhi::validation
         }
     }
 
+    static GraphicsResourceType GetGraphicsResourceType(ResourceType type)
+    {
+        switch (type)
+        {
+        case ResourceType::Texture_SRV:
+        case ResourceType::TypedBuffer_SRV:
+        case ResourceType::StructuredBuffer_SRV:
+        case ResourceType::RawBuffer_SRV:
+        case ResourceType::RayTracingAccelStruct:
+            return GraphicsResourceType::SRV;
+
+        case ResourceType::Texture_UAV:
+        case ResourceType::TypedBuffer_UAV:
+        case ResourceType::StructuredBuffer_UAV:
+        case ResourceType::RawBuffer_UAV:
+        case ResourceType::SamplerFeedbackTexture_UAV:
+            return GraphicsResourceType::UAV;
+
+        case ResourceType::ConstantBuffer:
+        case ResourceType::VolatileConstantBuffer:
+        case ResourceType::PushConstants:
+            return GraphicsResourceType::CB;
+
+        case ResourceType::Sampler:
+            return GraphicsResourceType::Sampler;
+
+        case ResourceType::None:
+        case ResourceType::Count:
+        default:
+            utils::InvalidEnum();
+            return GraphicsResourceType::SRV;
+        }
+    }
+
+    static const BindingLayoutItem* FindBindingLayoutItem(const BindingLayoutDesc& desc, ResourceType type, uint32_t slot, uint32_t arrayElement)
+    {
+        const GraphicsResourceType graphicsType = GetGraphicsResourceType(type);
+
+        for (const auto& item : desc.bindings)
+        {
+            if (GetGraphicsResourceType(item.type) == graphicsType &&
+                item.slot == slot &&
+                arrayElement < item.getArraySize())
+            {
+                return &item;
+            }
+        }
+
+        return nullptr;
+    }
+
     template<typename ItemType, typename DescType>
     const ItemType* SelectShaderStage(const DescType& desc, ShaderType stage)
     {
@@ -1328,6 +1379,84 @@ namespace nvrhi::validation
 
     nvrhi::rt::PipelineHandle DeviceWrapper::createRayTracingPipeline(const rt::PipelineDesc& desc)
     {
+        std::vector<IShader*> globalShaders;
+
+        for (const auto& shaderDesc : desc.shaders)
+        {
+            if (!shaderDesc.shader)
+            {
+                error("Ray tracing pipeline contains a NULL shader");
+                return nullptr;
+            }
+
+            if ((shaderDesc.shader->getDesc().shaderType & ShaderType::AllRayTracing) == 0)
+            {
+                std::stringstream ss;
+                ss << "Unexpected shader type used in createRayTracingPipeline: expected a ray tracing shader, actual shaderType = "
+                    << utils::ShaderStageToString(shaderDesc.shader->getDesc().shaderType)
+                    << " in " << utils::DebugNameToString(shaderDesc.shader->getDesc().debugName)
+                    << ":" << shaderDesc.shader->getDesc().entryName;
+                error(ss.str());
+                return nullptr;
+            }
+
+            globalShaders.push_back(shaderDesc.shader);
+
+            if (shaderDesc.bindingLayout)
+            {
+                static_vector<BindingLayoutHandle, c_MaxBindingLayouts> localLayouts;
+                localLayouts.push_back(shaderDesc.bindingLayout);
+                std::vector<IShader*> localShaders = { shaderDesc.shader };
+
+                if (!validatePipelineBindingLayouts(localLayouts, localShaders))
+                    return nullptr;
+            }
+        }
+
+        for (const auto& hitGroupDesc : desc.hitGroups)
+        {
+            std::vector<IShader*> localShaders;
+
+            if (hitGroupDesc.closestHitShader)
+            {
+                if (!validateShaderType(ShaderType::ClosestHit, hitGroupDesc.closestHitShader->getDesc(), "createRayTracingPipeline"))
+                    return nullptr;
+
+                globalShaders.push_back(hitGroupDesc.closestHitShader);
+                localShaders.push_back(hitGroupDesc.closestHitShader);
+            }
+
+            if (hitGroupDesc.anyHitShader)
+            {
+                if (!validateShaderType(ShaderType::AnyHit, hitGroupDesc.anyHitShader->getDesc(), "createRayTracingPipeline"))
+                    return nullptr;
+
+                globalShaders.push_back(hitGroupDesc.anyHitShader);
+                localShaders.push_back(hitGroupDesc.anyHitShader);
+            }
+
+            if (hitGroupDesc.intersectionShader)
+            {
+                if (!validateShaderType(ShaderType::Intersection, hitGroupDesc.intersectionShader->getDesc(), "createRayTracingPipeline"))
+                    return nullptr;
+
+                globalShaders.push_back(hitGroupDesc.intersectionShader);
+                localShaders.push_back(hitGroupDesc.intersectionShader);
+            }
+
+            if (hitGroupDesc.bindingLayout)
+            {
+                static_vector<BindingLayoutHandle, c_MaxBindingLayouts> localLayouts;
+                localLayouts.push_back(hitGroupDesc.bindingLayout);
+
+                if (!validatePipelineBindingLayouts(localLayouts, localShaders))
+                    return nullptr;
+            }
+        }
+
+        if (!validatePipelineBindingLayouts(desc.globalBindingLayouts, globalShaders))
+            return nullptr;
+
         return m_Device->createRayTracingPipeline(desc);
     }
 
@@ -1879,6 +2008,20 @@ namespace nvrhi::validation
         {
             if (!validateBindingSetItem(desc.bindings[index], nullptr, errorStream))
                 anyErrors = true;
+
+            const BindingSetItem& binding = desc.bindings[index];
+            const BindingLayoutItem* layoutItem = FindBindingLayoutItem(*layoutDesc, binding.type, binding.slot, binding.arrayElement);
+
+            if (layoutItem && layoutItem->type != binding.type)
+            {
+                errorStream << "Binding type mismatch for "
+                    << utils::ResourceTypeToString(binding.type) << " at slot " << binding.slot;
+                if (binding.arrayElement != 0)
+                    errorStream << "[" << binding.arrayElement << "]";
+                errorStream << ": layout declares " << utils::ResourceTypeToString(layoutItem->type)
+                    << " but the binding set provides " << utils::ResourceTypeToString(binding.type) << std::endl;
+                anyErrors = true;
+            }
         }
 
         if (anyErrors)

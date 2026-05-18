@@ -52,11 +52,7 @@ namespace nvrhi::d3d12
         b = GetNormalizedResourceType(b);
 
         if ((a == ResourceType::TypedBuffer_SRV && b == ResourceType::Texture_SRV) ||
-            (b == ResourceType::TypedBuffer_SRV && a == ResourceType::Texture_SRV) ||
-            (a == ResourceType::TypedBuffer_SRV && b == ResourceType::RayTracingAccelStruct) ||
-            (a == ResourceType::Texture_SRV && b == ResourceType::RayTracingAccelStruct) ||
-            (b == ResourceType::TypedBuffer_SRV && a == ResourceType::RayTracingAccelStruct) ||
-            (b == ResourceType::Texture_SRV && a == ResourceType::RayTracingAccelStruct))
+            (b == ResourceType::TypedBuffer_SRV && a == ResourceType::Texture_SRV))
             return true;
 
         if ((a == ResourceType::TypedBuffer_UAV && b == ResourceType::Texture_UAV) ||
@@ -434,7 +430,7 @@ namespace nvrhi::d3d12
                     range.BaseShaderRegister = binding.slot;
                     range.RegisterSpace = desc.registerSpace;
                     range.OffsetInDescriptorsFromTableStart = descriptorTableSizeSamplers;
-                    range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_NONE;
+                    range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE;
 
                     descriptorTableSizeSamplers += binding.size;
                 }
@@ -479,9 +475,9 @@ namespace nvrhi::d3d12
                     range.RegisterSpace = desc.registerSpace;
                     range.OffsetInDescriptorsFromTableStart = descriptorTableSizeSRVetc;
 
-                    // We don't know how apps will use resources referenced in a binding set. They may bind 
-                    // a buffer to the command list and then copy data into it.
-                    range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
+                    // Descriptors in these tables may be updated between command list recording and submission,
+                    // so the descriptor identity itself must be treated as volatile in RS 1.1.
+                    range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
 
                     descriptorTableSizeSRVetc += binding.size;
 
@@ -623,7 +619,7 @@ namespace nvrhi::d3d12
             descriptorRange.NumDescriptors = ~0u; // unbounded
             descriptorRange.BaseShaderRegister = desc.firstSlot;
             descriptorRange.RegisterSpace = item.slot;
-            descriptorRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE;
+            descriptorRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
             descriptorRange.OffsetInDescriptorsFromTableStart = 0;
         }
 
@@ -933,7 +929,13 @@ namespace nvrhi::d3d12
 
                 if (_bindingSet->getDesc())
                 {
-                    assert(layoutAndOffset.first == _bindingSet->getLayout()); // validation layer handles this
+                    if (layoutAndOffset.first != _bindingSet->getLayout())
+                    {
+                        std::stringstream ss;
+                        ss << "Binding set in slot " << bindingSetIndex << " does not match the expected layout for the active root signature";
+                        m_Context.error(ss.str());
+                        continue;
+                    }
 
                     BindingSet* bindingSet = checked_cast<BindingSet*>(_bindingSet);
 
@@ -1060,7 +1062,13 @@ namespace nvrhi::d3d12
 
                 if (_bindingSet->getDesc())
                 {
-                    assert(layoutAndOffset.first == _bindingSet->getLayout()); // validation layer handles this
+                    if (layoutAndOffset.first != _bindingSet->getLayout())
+                    {
+                        std::stringstream ss;
+                        ss << "Binding set in slot " << bindingSetIndex << " does not match the expected layout for the active root signature";
+                        m_Context.error(ss.str());
+                        continue;
+                    }
 
                     BindingSet* bindingSet = checked_cast<BindingSet*>(_bindingSet);
 
