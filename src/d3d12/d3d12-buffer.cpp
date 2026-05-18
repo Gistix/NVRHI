@@ -89,6 +89,13 @@ namespace nvrhi::d3d12
         if (buffer->desc.canHaveUAVs)
             resourceDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
+        if (d.isVirtual && d.isTiled)
+        {
+            m_Context.error("Buffer cannot be both virtual and tiled.");
+            delete buffer;
+            return nullptr;
+        }
+
         if (d.isVirtual)
         {
             return BufferHandle::Create(buffer);
@@ -138,18 +145,38 @@ namespace nvrhi::d3d12
             initialState = D3D12_RESOURCE_STATE_COMMON;
         }
 
-        HRESULT res = m_Context.device->CreateCommittedResource(
-            &heapProps,
-            heapFlags,
-            &resourceDesc,
-            initialState,
-            nullptr,
-            IID_PPV_ARGS(&buffer->resource));
+        HRESULT res = S_OK;
+        if (d.isTiled)
+        {
+            if (buffer->desc.cpuAccess != CpuAccessMode::None)
+            {
+                m_Context.error("Tiled buffers must use CpuAccessMode::None.");
+                delete buffer;
+                return nullptr;
+            }
+
+            res = m_Context.device->CreateReservedResource(
+                &resourceDesc,
+                initialState,
+                nullptr,
+                IID_PPV_ARGS(&buffer->resource));
+        }
+        else
+        {
+            res = m_Context.device->CreateCommittedResource(
+                &heapProps,
+                heapFlags,
+                &resourceDesc,
+                initialState,
+                nullptr,
+                IID_PPV_ARGS(&buffer->resource));
+        }
 
         if (FAILED(res))
         {
             std::stringstream ss;
-            ss << "CreateCommittedResource call failed for buffer " << utils::DebugNameToString(d.debugName)
+            ss << (d.isTiled ? "CreateReservedResource" : "CreateCommittedResource")
+                << " call failed for buffer " << utils::DebugNameToString(d.debugName)
                 << ", HRESULT = 0x" << std::hex << std::setw(8) << res;
             m_Context.error(ss.str());
 
@@ -313,6 +340,9 @@ namespace nvrhi::d3d12
 
         if (!buffer->desc.isVirtual)
             return false; // not supported
+
+        if (buffer->desc.isTiled)
+            return false; // reserved resources are not placed into heaps
 
         D3D12_RESOURCE_STATES initialState = convertResourceStates(buffer->desc.initialState);
         if (initialState != D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE)
