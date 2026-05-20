@@ -228,7 +228,7 @@ namespace nvrhi::d3d12
         }
     }
 
-    static D3D12_RESOURCE_DESC convertTextureDesc(const TextureDesc& d)
+    D3D12_RESOURCE_DESC convertTextureDesc(const TextureDesc& d)
     {
         const auto& formatMapping = getDxgiFormatMapping(d.format);
         const FormatInfo& formatInfo = getFormatInfo(d.format);
