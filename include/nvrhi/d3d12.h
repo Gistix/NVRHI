@@ -133,4 +133,8 @@ namespace nvrhi::d3d12
     NVRHI_API DeviceHandle createDevice(const DeviceDesc& desc);
 
     NVRHI_API DXGI_FORMAT convertFormat(nvrhi::Format format);
+
+    NVRHI_API D3D12_RESOURCE_DESC convertTextureDesc(const TextureDesc& d);
+
+    NVRHI_API D3D12_RESOURCE_STATES convertResourceStates(ResourceStates stateBits);
 }
