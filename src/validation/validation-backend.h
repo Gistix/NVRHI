@@ -140,7 +140,8 @@ namespace nvrhi::validation
         const rt::AccelStructDesc& getDesc() const override { return m_AccelStruct->getDesc(); }
         bool isCompacted() const override { return m_AccelStruct->isCompacted(); }
         uint64_t getDeviceAddress() const override { return m_AccelStruct->getDeviceAddress(); };
-        
+        uint64_t getBufferSize() const override { return m_AccelStruct->getBufferSize(); };
+
     private:
         rt::AccelStructHandle m_AccelStruct;
     };
@@ -381,6 +382,7 @@ namespace nvrhi::validation
         bool writeDescriptorTable(IDescriptorTable* descriptorTable, const BindingSetItem& item) override;
 
         rt::OpacityMicromapHandle createOpacityMicromap(const rt::OpacityMicromapDesc& desc)  override;
+        rt::AccelStructPrebuildInfo getAccelStructPreBuildInfo(const rt::AccelStructDesc& desc) override;
         rt::AccelStructHandle createAccelStruct(const rt::AccelStructDesc& desc) override;
         MemoryRequirements getAccelStructMemoryRequirements(rt::IAccelStruct* as) override;
         rt::cluster::OperationSizeInfo getClusterOperationSizeInfo(const rt::cluster::OperationParams& params) override;
