@@ -846,7 +846,8 @@ namespace nvrhi::d3d12
         bool queryMemoryRequirements(MemoryRequirements& outRequirements) override;
         bool isCompacted() const override { return compacted; }
         uint64_t getDeviceAddress() const override;
-        
+        uint64_t getBufferSize() const override;
+
     private:
         const Context& m_Context;
     };
@@ -1334,6 +1335,7 @@ namespace nvrhi::d3d12
         bool writeDescriptorTable(IDescriptorTable* descriptorTable, const BindingSetItem& item) override;
 
         rt::OpacityMicromapHandle createOpacityMicromap(const rt::OpacityMicromapDesc& desc) override;
+        rt::AccelStructPrebuildInfo getAccelStructPreBuildInfo(const rt::AccelStructDesc& desc) override;
         rt::AccelStructHandle createAccelStruct(const rt::AccelStructDesc& desc) override;
         MemoryRequirements getAccelStructMemoryRequirements(rt::IAccelStruct* as) override;
         rt::cluster::OperationSizeInfo getClusterOperationSizeInfo(const rt::cluster::OperationParams& params) override;
