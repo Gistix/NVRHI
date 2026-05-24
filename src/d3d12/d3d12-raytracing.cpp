@@ -486,6 +486,14 @@ namespace nvrhi::d3d12
         return dataBuffer->gpuVA;
     }
 
+    uint64_t AccelStruct::getBufferSize() const
+    {
+        if (dataBuffer)
+            return dataBuffer->desc.byteSize;
+
+        return 0;
+    }
+
 #if NVRHI_WITH_NVAPI_OPACITY_MICROMAP
     static const NVAPI_D3D12_RAYTRACING_OPACITY_MICROMAP_USAGE_COUNT* CastToUsageCount(const nvrhi::rt::OpacityMicromapUsageCount* desc)
     {
@@ -880,6 +888,20 @@ namespace nvrhi::d3d12
             m_Context.device5->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &outPreBuildInfo);
             return true;
         }
+    }
+
+    rt::AccelStructPrebuildInfo Device::getAccelStructPreBuildInfo(const rt::AccelStructDesc& desc)
+    {
+        rt::AccelStructPrebuildInfo prebuildInfo{};
+
+        D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO ASPreBuildInfo = {};
+        if (GetAccelStructPreBuildInfo(ASPreBuildInfo, desc)) {
+			prebuildInfo.resultMaxSizeInBytes = ASPreBuildInfo.ResultDataMaxSizeInBytes;
+			prebuildInfo.scratchSizeInBytes = ASPreBuildInfo.ScratchDataSizeInBytes;
+			prebuildInfo.updateScratchSizeInBytes = ASPreBuildInfo.UpdateScratchDataSizeInBytes;
+        }
+
+        return prebuildInfo;
     }
 
     rt::AccelStructHandle Device::createAccelStruct(const rt::AccelStructDesc& desc)

@@ -2095,6 +2095,11 @@ namespace nvrhi::validation
         return omm;
     }
 
+    rt::AccelStructPrebuildInfo DeviceWrapper::getAccelStructPreBuildInfo(const rt::AccelStructDesc& desc)
+    {
+        return m_Device->getAccelStructPreBuildInfo(desc);
+    }
+
     rt::AccelStructHandle DeviceWrapper::createAccelStruct(const rt::AccelStructDesc& desc)
     {
         rt::AccelStructHandle as = m_Device->createAccelStruct(desc);

@@ -1728,6 +1728,13 @@ namespace nvrhi
             AccelStructDesc& setIsVirtual(bool value) { isVirtual = value; return *this; }
         };
 
+		struct AccelStructPrebuildInfo
+		{
+            uint64_t resultMaxSizeInBytes = 0;
+            uint64_t scratchSizeInBytes = 0;
+			uint64_t updateScratchSizeInBytes = 0;
+		};
+
         //////////////////////////////////////////////////////////////////////////
         // rt::AccelStruct
         //////////////////////////////////////////////////////////////////////////
@@ -1738,6 +1745,7 @@ namespace nvrhi
             [[nodiscard]] virtual const AccelStructDesc& getDesc() const = 0;
             [[nodiscard]] virtual bool isCompacted() const = 0;
             [[nodiscard]] virtual uint64_t getDeviceAddress() const = 0;
+            [[nodiscard]] virtual uint64_t getBufferSize() const = 0;
         };
 
         typedef RefCountPtr<IAccelStruct> AccelStructHandle;
@@ -3675,6 +3683,7 @@ namespace nvrhi
         virtual bool writeDescriptorTable(IDescriptorTable* descriptorTable, const BindingSetItem& item) = 0;
 
         virtual rt::OpacityMicromapHandle createOpacityMicromap(const rt::OpacityMicromapDesc& desc) = 0;
+        virtual rt::AccelStructPrebuildInfo getAccelStructPreBuildInfo(const rt::AccelStructDesc& desc) = 0;
         virtual rt::AccelStructHandle createAccelStruct(const rt::AccelStructDesc& desc) = 0;
         virtual MemoryRequirements getAccelStructMemoryRequirements(rt::IAccelStruct* as) = 0;
         virtual rt::cluster::OperationSizeInfo getClusterOperationSizeInfo(const rt::cluster::OperationParams& params) = 0;
