@@ -557,49 +557,6 @@ namespace nvrhi::d3d12
         }
     }
 
-    void Device::getBufferTiling(IBuffer* _buffer, uint32_t* numTiles)
-    {
-        Buffer* buffer = checked_cast<Buffer*>(_buffer);
-        m_Context.device->GetResourceTiling(buffer->resource, numTiles, nullptr, nullptr, nullptr, 0, nullptr);
-    }
-
-    void Device::updateBufferTileMappings(IBuffer* _buffer, const BufferTilesMapping* tileMappings, uint32_t numTileMappings, CommandQueue executionQueue)
-    {
-        Queue* queue = getQueue(executionQueue);
-        Buffer* buffer = checked_cast<Buffer*>(_buffer);
-
-        for (uint32_t i = 0; i < numTileMappings; i++)
-        {
-            ID3D12Heap* heap = tileMappings[i].heap ? checked_cast<Heap*>(tileMappings[i].heap)->heap : nullptr;
-            uint32_t numRegions = tileMappings[i].numBufferRegions;
-
-            std::vector<D3D12_TILED_RESOURCE_COORDINATE> resourceCoordinates(numRegions);
-            std::vector<D3D12_TILE_REGION_SIZE> regionSizes(numRegions);
-            std::vector<D3D12_TILE_RANGE_FLAGS> rangeFlags(numRegions, heap ? D3D12_TILE_RANGE_FLAG_NONE : D3D12_TILE_RANGE_FLAG_NULL);
-            std::vector<UINT> heapStartOffsets(numRegions);
-            std::vector<UINT> rangeTileCounts(numRegions);
-
-            for (uint32_t j = 0; j < numRegions; ++j)
-            {
-                const TiledBufferRegion& tiledBufferRegion = tileMappings[i].tiledBufferRegions[j];
-                resourceCoordinates[j].Subresource = 0;
-                resourceCoordinates[j].X = tiledBufferRegion.startTileIndexInResource;
-                resourceCoordinates[j].Y = 0;
-                resourceCoordinates[j].Z = 0;
-
-                regionSizes[j].NumTiles = tiledBufferRegion.tilesNum;
-                regionSizes[j].UseBox = false;
-
-                if (heap)
-                    heapStartOffsets[j] = static_cast<UINT>(tileMappings[i].byteOffsets[j] / D3D12_TILED_RESOURCE_TILE_SIZE_IN_BYTES);
-
-                rangeTileCounts[j] = tiledBufferRegion.tilesNum;
-            }
-
-            queue->queue->UpdateTileMappings(buffer->resource, numRegions, resourceCoordinates.data(), regionSizes.data(), heap, numRegions, rangeFlags.data(), heap ? heapStartOffsets.data() : nullptr, rangeTileCounts.data(), D3D12_TILE_MAPPING_FLAG_NONE);
-        }
-    }
-
     void Device::runGarbageCollection()
     {
         for (const auto& pQueue : m_Queues)

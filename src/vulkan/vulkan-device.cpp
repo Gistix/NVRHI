@@ -658,24 +658,6 @@ namespace nvrhi::vulkan
         }
     }
 
-    void Device::getBufferTiling(IBuffer* buffer, uint32_t* numTiles)
-    {
-        (void)buffer;
-        (void)numTiles;
-
-        utils::NotSupported();
-    }
-
-    void Device::updateBufferTileMappings(IBuffer* buffer, const BufferTilesMapping* tileMappings, uint32_t numTileMappings, CommandQueue executionQueue)
-    {
-        (void)buffer;
-        (void)tileMappings;
-        (void)numTileMappings;
-        (void)executionQueue;
-
-        utils::NotSupported();
-    }
-
     SamplerFeedbackTextureHandle Device::createSamplerFeedbackTexture(ITexture* pairedTexture, const SamplerFeedbackTextureDesc& desc)
     {
         (void)pairedTexture;

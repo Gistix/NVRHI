@@ -582,20 +582,6 @@ namespace nvrhi
         IHeap* heap = nullptr;
     };
 
-    struct TiledBufferRegion
-    {
-        uint32_t startTileIndexInResource = 0;
-        uint32_t tilesNum = 0;
-    };
-
-    struct BufferTilesMapping
-    {
-        TiledBufferRegion* tiledBufferRegions = nullptr;
-        uint64_t* byteOffsets = nullptr;
-        uint32_t numBufferRegions = 0;
-        IHeap* heap = nullptr;
-    };
-
     struct PackedMipDesc
     {
         uint32_t numStandardMips = 0;
@@ -701,10 +687,6 @@ namespace nvrhi
         // A dynamic/upload buffer whose contents only live in the current command list
         bool isVolatile = false;
 
-        // Indicates that the buffer should be created as a tiled/reserved resource.
-        // Only supported on DX12.
-        bool isTiled = false;
-
         // Indicates that the buffer is created with no backing memory,
         // and memory is bound to the buffer later using bindBufferMemory.
         // On DX12, the buffer resource is created at the time of memory binding.
@@ -735,7 +717,6 @@ namespace nvrhi
         constexpr BufferDesc& setIsAccelStructStorage(bool value) { isAccelStructStorage = value; return *this; }
         constexpr BufferDesc& setIsShaderBindingTable(bool value) { isShaderBindingTable = value; return *this; }
         constexpr BufferDesc& setIsVolatile(bool value) { isVolatile = value; return *this; }
-        constexpr BufferDesc& setIsTiled(bool value) { isTiled = value; return *this; }
         constexpr BufferDesc& setIsVirtual(bool value) { isVirtual = value; return *this; }
         constexpr BufferDesc& setInitialState(ResourceStates value) { initialState = value; return *this; }
         constexpr BufferDesc& setKeepInitialState(bool value) { keepInitialState = value; return *this; }
@@ -3637,8 +3618,6 @@ namespace nvrhi
 
         virtual void getTextureTiling(ITexture* texture, uint32_t* numTiles, PackedMipDesc* desc, TileShape* tileShape, uint32_t* subresourceTilingsNum, SubresourceTiling* subresourceTilings) = 0;
         virtual void updateTextureTileMappings(ITexture* texture, const TextureTilesMapping* tileMappings, uint32_t numTileMappings, CommandQueue executionQueue = CommandQueue::Graphics) = 0;
-        virtual void getBufferTiling(IBuffer* buffer, uint32_t* numTiles) = 0;
-        virtual void updateBufferTileMappings(IBuffer* buffer, const BufferTilesMapping* tileMappings, uint32_t numTileMappings, CommandQueue executionQueue = CommandQueue::Graphics) = 0;
 
         virtual SamplerFeedbackTextureHandle createSamplerFeedbackTexture(ITexture* pairedTexture, const SamplerFeedbackTextureDesc& desc) = 0;
         virtual SamplerFeedbackTextureHandle createSamplerFeedbackForNativeTexture(ObjectType objectType, Object texture, ITexture* pairedTexture) = 0;

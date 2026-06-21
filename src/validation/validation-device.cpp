@@ -279,16 +279,6 @@ namespace nvrhi::validation
         m_Device->updateTextureTileMappings(texture, tileMappings, numTileMappings, executionQueue);
     }
 
-    void DeviceWrapper::getBufferTiling(IBuffer* buffer, uint32_t* numTiles)
-    {
-        m_Device->getBufferTiling(buffer, numTiles);
-    }
-
-    void DeviceWrapper::updateBufferTileMappings(IBuffer* buffer, const BufferTilesMapping* tileMappings, uint32_t numTileMappings, CommandQueue executionQueue)
-    {
-        m_Device->updateBufferTileMappings(buffer, tileMappings, numTileMappings, executionQueue);
-    }
-
     SamplerFeedbackTextureHandle DeviceWrapper::createSamplerFeedbackTexture(ITexture* pairedTexture, const SamplerFeedbackTextureDesc& desc)
     {
         const GraphicsAPI graphicsApi = m_Device->getGraphicsAPI();
