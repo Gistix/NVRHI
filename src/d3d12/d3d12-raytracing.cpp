@@ -2093,7 +2093,7 @@ namespace nvrhi::d3d12
 #else
         D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO ASPreBuildInfo = {};
 
-        if (!checked_cast<d3d12::Device*>(m_Device)->GetAccelStructPreBuildInfo(ASPreBuildInfo, as->getDesc()))
+        if (!m_Device->GetAccelStructPreBuildInfo(ASPreBuildInfo, as->getDesc()))
             return;
 
         if (ASPreBuildInfo.ResultDataMaxSizeInBytes > as->dataBuffer->desc.byteSize)
@@ -2131,8 +2131,7 @@ namespace nvrhi::d3d12
         commitBarriers();
 
 #if NVRHI_WITH_NVAPI_OPACITY_MICROMAP || NVRHI_WITH_NVAPI_LSS
-        d3d12::Device* d3d12Device = checked_cast<d3d12::Device*>(m_Device);
-        if (d3d12Device->GetOpacityMicromapSupported() || d3d12Device->GetLinearSweptSpheresSupported())
+        if (m_Device->GetOpacityMicromapSupported() || m_Device->GetLinearSweptSpheresSupported())
         {
             NVAPI_D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC_EX buildDesc = {};
             buildDesc.inputs = inputs.GetAs<NVAPI_D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS_EX>();
@@ -2182,6 +2181,28 @@ namespace nvrhi::d3d12
             }
         }
 #endif
+    }
+
+    void CommandList::copyRaytracingAccelerationStructure(rt::IAccelStruct* destination, rt::IAccelStruct* source)
+    {
+        AccelStruct* dstAS = checked_cast<AccelStruct*>(destination);
+        AccelStruct* srcAS = checked_cast<AccelStruct*>(source);
+
+        if (dstAS && srcAS && dstAS->dataBuffer && srcAS->dataBuffer)
+        {
+            if (m_EnableAutomaticBarriers)
+            {
+                requireBufferState(srcAS->dataBuffer, ResourceStates::AccelStructBuildBlas);
+                requireBufferState(dstAS->dataBuffer, ResourceStates::AccelStructWrite);
+                m_BindingStatesDirty = true;
+            }
+            commitBarriers();
+
+            m_ActiveCommandList->commandList4->CopyRaytracingAccelerationStructure(
+                dstAS->dataBuffer->gpuVA,
+                srcAS->dataBuffer->gpuVA,
+                D3D12_RAYTRACING_ACCELERATION_STRUCTURE_COPY_MODE_CLONE);
+        }
     }
 
     void CommandList::buildTopLevelAccelStructInternal(AccelStruct* as, D3D12_GPU_VIRTUAL_ADDRESS instanceData, size_t numInstances, rt::AccelStructBuildFlags buildFlags)

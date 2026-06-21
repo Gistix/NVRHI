@@ -35,6 +35,8 @@ namespace nvrhi::vulkan
 
         BindingSet* bindingSet = checked_cast<BindingSet*>(_bindingSet);
 
+        ResourceStates const shaderResourceState = getShaderResourceStateForBindingLayout(bindingSet->layout);
+
         for (auto bindingIndex : bindingSet->bindingsThatNeedTransitions)
         {
             const BindingSetItem& binding = bindingSet->desc.bindings[bindingIndex];
@@ -42,8 +44,19 @@ namespace nvrhi::vulkan
             switch(binding.type)  // NOLINT(clang-diagnostic-switch-enum)
             {
                 case ResourceType::Texture_SRV:
-                    requireTextureState(checked_cast<ITexture*>(binding.resourceHandle), binding.subresources, ResourceStates::ShaderResource);
+                {
+                    // Depth/stencil textures bound as SRV must transition to eDepthStencilReadOnlyOptimal,
+                    // not eShaderReadOnlyOptimal, because the descriptor already declares it as such
+                    // (see vulkan-resource-bindings.cpp). We achieve this by combining ShaderResource with
+                    // DepthRead, vulkan-constants.cpp resolves that combination to eDepthStencilReadOnlyOptimal.
+                    auto* texture = checked_cast<Texture*>(binding.resourceHandle);
+                    const FormatInfo& fmtInfo = getFormatInfo(texture->desc.format);
+                    const ResourceStates srvState = (fmtInfo.hasDepth || fmtInfo.hasStencil)
+                        ? (shaderResourceState | ResourceStates::DepthRead)
+                        : shaderResourceState;
+                    requireTextureState(texture, binding.subresources, srvState);
                     break;
+                }
 
                 case ResourceType::Texture_UAV:
                     requireTextureState(checked_cast<ITexture*>(binding.resourceHandle), binding.subresources, ResourceStates::UnorderedAccess);
@@ -52,7 +65,7 @@ namespace nvrhi::vulkan
                 case ResourceType::TypedBuffer_SRV:
                 case ResourceType::StructuredBuffer_SRV:
                 case ResourceType::RawBuffer_SRV:
-                    requireBufferState(checked_cast<IBuffer*>(binding.resourceHandle), ResourceStates::ShaderResource);
+                    requireBufferState(checked_cast<IBuffer*>(binding.resourceHandle), shaderResourceState);
                     break;
 
                 case ResourceType::TypedBuffer_UAV:
@@ -128,6 +141,11 @@ namespace nvrhi::vulkan
             requireBufferState(state.indirectParams, ResourceStates::IndirectArgument);
         }
 
+        if (state.indirectCountBuffer && (m_BindingStatesDirty || state.indirectCountBuffer != m_CurrentGraphicsState.indirectCountBuffer))
+        {
+            requireBufferState(state.indirectCountBuffer, ResourceStates::IndirectArgument);
+        }
+
         m_BindingStatesDirty = false;
     }
 
@@ -159,6 +177,11 @@ namespace nvrhi::vulkan
             requireBufferState(state.indirectParams, ResourceStates::IndirectArgument);
         }
 
+        if (state.indirectCountBuffer && (m_BindingStatesDirty || state.indirectCountBuffer != m_CurrentMeshletState.indirectCountBuffer))
+        {
+            requireBufferState(state.indirectCountBuffer, ResourceStates::IndirectArgument);
+        }
+        
         m_BindingStatesDirty = false;
     }
 
