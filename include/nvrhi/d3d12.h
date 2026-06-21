@@ -145,7 +145,7 @@ namespace nvrhi::d3d12
 
     NVRHI_API DXGI_FORMAT convertFormat(nvrhi::Format format);
 
-    NVRHI_API D3D12_RESOURCE_DESC convertTextureDesc(const TextureDesc& d);
+    NVRHI_API D3D12_RESOURCE_DESC1 convertTextureDesc(const TextureDesc& d);
 
     NVRHI_API D3D12_RESOURCE_STATES convertResourceStates(ResourceStates stateBits);
 }
