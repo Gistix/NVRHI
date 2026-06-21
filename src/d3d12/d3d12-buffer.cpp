@@ -129,11 +129,6 @@ namespace nvrhi::d3d12
                 break;
         }
 
-        if (d.isAccelStructStorage)
-        {
-            resourceDesc.Flags |= D3D12_RESOURCE_FLAG_RAYTRACING_ACCELERATION_STRUCTURE;
-        }
-
         // Allow readback buffers to be used as resolve destination targets
         if ((buffer->desc.cpuAccess == CpuAccessMode::Read) && (d.initialState == ResourceStates::ResolveDest))
         {
