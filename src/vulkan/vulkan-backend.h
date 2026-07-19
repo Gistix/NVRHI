@@ -1028,6 +1028,7 @@ namespace nvrhi::vulkan
         const rt::AccelStructDesc& getDesc() const override { return desc; }
         bool isCompacted() const override { return compacted; }
         uint64_t getDeviceAddress() const override;
+        uint64_t getBufferSize() const override;
 
     private:
         const VulkanContext& m_Context;
@@ -1108,6 +1109,7 @@ namespace nvrhi::vulkan
         // event queries
         EventQueryHandle createEventQuery() override;
         void setEventQuery(IEventQuery* query, CommandQueue queue) override;
+        void setEventQuery(IEventQuery* query, CommandQueue queue, uint64_t fenceCounter) override;
         bool pollEventQuery(IEventQuery* query) override;
         void waitEventQuery(IEventQuery* query) override;
         void resetEventQuery(IEventQuery* query) override;
@@ -1144,6 +1146,7 @@ namespace nvrhi::vulkan
         bool writeDescriptorTable(IDescriptorTable* descriptorTable, const BindingSetItem& item) override;
         
         rt::OpacityMicromapHandle createOpacityMicromap(const rt::OpacityMicromapDesc& desc) override;
+        rt::AccelStructPrebuildInfo getAccelStructPreBuildInfo(const rt::AccelStructDesc& desc) override;
         rt::AccelStructHandle createAccelStruct(const rt::AccelStructDesc& desc) override;
         MemoryRequirements getAccelStructMemoryRequirements(rt::IAccelStruct* as) override;
         rt::cluster::OperationSizeInfo getClusterOperationSizeInfo(const rt::cluster::OperationParams& params) override;

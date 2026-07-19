@@ -321,6 +321,70 @@ namespace nvrhi::vulkan
         return rt::OpacityMicromapHandle::Create(om);
     }
 
+    rt::AccelStructPrebuildInfo Device::getAccelStructPreBuildInfo(const rt::AccelStructDesc& desc)
+    {
+        rt::AccelStructPrebuildInfo prebuildInfo{};
+
+#ifdef NVRHI_WITH_RTXMU
+        bool isManaged = desc.isTopLevel;
+#else
+        bool isManaged = true;
+#endif
+
+        if (isManaged)
+        {
+            std::vector<vk::AccelerationStructureGeometryKHR> geometries;
+            std::vector<vk::AccelerationStructureTrianglesOpacityMicromapEXT> omms;
+            std::vector<vk::AccelerationStructureGeometryLinearSweptSpheresDataNV> lss;
+            std::vector<uint32_t> maxPrimitiveCounts;
+
+            auto buildInfo = vk::AccelerationStructureBuildGeometryInfoKHR();
+
+            if (desc.isTopLevel)
+            {
+                geometries.push_back(vk::AccelerationStructureGeometryKHR()
+                    .setGeometryType(vk::GeometryTypeKHR::eInstances));
+
+                geometries[0].geometry.setInstances(vk::AccelerationStructureGeometryInstancesDataKHR());
+
+                maxPrimitiveCounts.push_back(uint32_t(desc.topLevelMaxInstances));
+
+                buildInfo.setType(vk::AccelerationStructureTypeKHR::eTopLevel);
+            }
+            else
+            {
+                geometries.resize(desc.bottomLevelGeometries.size());
+                omms.resize(desc.bottomLevelGeometries.size());
+                lss.resize(desc.bottomLevelGeometries.size());
+                maxPrimitiveCounts.resize(desc.bottomLevelGeometries.size());
+
+                for (size_t i = 0; i < desc.bottomLevelGeometries.size(); i++)
+                {
+                    convertBottomLevelGeometry(desc.bottomLevelGeometries[i], geometries[i], omms[i], lss[i], maxPrimitiveCounts[i],
+                        nullptr, m_Context, nullptr, 0);
+                }
+
+                buildInfo.setType(vk::AccelerationStructureTypeKHR::eBottomLevel);
+            }
+
+            buildInfo.setMode(vk::BuildAccelerationStructureModeKHR::eBuild)
+                .setGeometries(geometries)
+                .setFlags(convertAccelStructBuildFlags(desc.buildFlags));
+
+            auto buildSizes = m_Context.device.getAccelerationStructureBuildSizesKHR(
+                vk::AccelerationStructureBuildTypeKHR::eDevice, buildInfo, maxPrimitiveCounts);
+
+            prebuildInfo.resultMaxSizeInBytes = buildSizes.accelerationStructureSize;
+            prebuildInfo.scratchSizeInBytes = buildSizes.buildScratchSize;
+            prebuildInfo.updateScratchSizeInBytes = buildSizes.updateScratchSize;
+        }
+        else {
+            utils::NotImplemented();
+        }
+
+        return prebuildInfo;
+    }
+
     rt::AccelStructHandle Device::createAccelStruct(const rt::AccelStructDesc& desc)
     {
         AccelStruct* as = new AccelStruct(m_Context);
@@ -1191,6 +1255,14 @@ namespace nvrhi::vulkan
             return m_Context.rtxMemUtil->GetDeviceAddress(rtxmuId);
 #endif
         return getBufferAddress(dataBuffer, 0).deviceAddress;
+    }
+
+    uint64_t AccelStruct::getBufferSize() const
+    {
+        if (dataBuffer)
+            return dataBuffer->getDesc().byteSize;
+
+        return 0;
     }
 
     OpacityMicromap::~OpacityMicromap()
