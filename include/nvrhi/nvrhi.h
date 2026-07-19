@@ -1633,12 +1633,15 @@ namespace nvrhi
 
             bool useTransform = false;
             AffineTransform transform{};
+            IBuffer* transformBuffer = nullptr;
+            uint64_t transformBufferOffset = 0;
             GeometryFlags flags = GeometryFlags::None;
             GeometryType geometryType = GeometryType::Triangles;
 
             GeometryDesc() : geometryData{} { }
 
             GeometryDesc& setTransform(const AffineTransform& value) { memcpy(&transform, &value, sizeof(AffineTransform)); useTransform = true; return *this; }
+            GeometryDesc& setTransformBuffer(IBuffer* buffer, uint64_t offset = 0) { transformBuffer = buffer; transformBufferOffset = offset; useTransform = true; return *this; }
             GeometryDesc& setFlags(GeometryFlags value) { flags = value; return *this; }
             GeometryDesc& setTriangles(const GeometryTriangles& value) { geometryData.triangles = value; geometryType = GeometryType::Triangles; return *this; }
             GeometryDesc& setAABBs(const GeometryAABBs& value) { geometryData.aabbs = value; geometryType = GeometryType::AABBs; return *this; }

@@ -1952,6 +1952,8 @@ namespace nvrhi::d3d12
                         requireBufferState(om->dataBuffer, ResourceStates::AccelStructBuildInput);
                     if (triangles.ommIndexBuffer)
                         requireBufferState(triangles.ommIndexBuffer, ResourceStates::AccelStructBuildInput);
+                    if (geometryDesc.transformBuffer)
+                        requireBufferState(geometryDesc.transformBuffer, ResourceStates::AccelStructBuildInput);
                 }
 
                 m_Instance->referencedResources.push_back(triangles.indexBuffer);
@@ -1960,6 +1962,8 @@ namespace nvrhi::d3d12
                     m_Instance->referencedResources.push_back(om);
                 if (triangles.ommIndexBuffer)
                     m_Instance->referencedResources.push_back(triangles.ommIndexBuffer);
+                if (geometryDesc.transformBuffer)
+                    m_Instance->referencedResources.push_back(geometryDesc.transformBuffer);
             }
             else if (geometryDesc.geometryType == rt::GeometryType::AABBs)
             {
@@ -2030,15 +2034,22 @@ namespace nvrhi::d3d12
             D3D12_GPU_VIRTUAL_ADDRESS gpuVA = 0;
             if (geometryDesc.useTransform)
             {
-                void* cpuVA = nullptr;
-                if (!m_UploadManager.suballocateBuffer(sizeof(rt::AffineTransform), nullptr, nullptr, nullptr,
-                    &cpuVA, &gpuVA, m_RecordingVersion, D3D12_RAYTRACING_TRANSFORM3X4_BYTE_ALIGNMENT))
+                if (geometryDesc.transformBuffer)
                 {
-                    m_Context.error("Couldn't suballocate an upload buffer");
-                    return;
+                    gpuVA = checked_cast<Buffer*>(geometryDesc.transformBuffer)->gpuVA + geometryDesc.transformBufferOffset;
                 }
+                else
+                {
+                    void* cpuVA = nullptr;
+                    if (!m_UploadManager.suballocateBuffer(sizeof(rt::AffineTransform), nullptr, nullptr, nullptr,
+                        &cpuVA, &gpuVA, m_RecordingVersion, D3D12_RAYTRACING_TRANSFORM3X4_BYTE_ALIGNMENT))
+                    {
+                        m_Context.error("Couldn't suballocate an upload buffer");
+                        return;
+                    }
 
-                memcpy(cpuVA, &geometryDesc.transform, sizeof(rt::AffineTransform));
+                    memcpy(cpuVA, &geometryDesc.transform, sizeof(rt::AffineTransform));
+                }
             }
 
             D3D12RaytracingGeometryDesc& geomDesc = inputs.GetGeometryDesc(i);

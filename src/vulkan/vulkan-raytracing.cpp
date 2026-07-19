@@ -119,42 +119,50 @@ namespace nvrhi::vulkan
 
             if (src.useTransform)
             {
-                // The alignment of the transforms is supposed to be 16 bytes, as reported by the validation layer,
-                // but there doesn't seem to be the appropriate constant or device property.
-                constexpr size_t TransformAlignment = 16;
-
-                if (uploadManager)
+                if (src.transformBuffer)
                 {
-                    // Suballocate a small piece of the upload buffer to copy the transform to the GPU.
-                    Buffer* uploadBuffer = nullptr;
-                    uint64_t uploadOffset = 0;
-                    void* uploadCpuVA = nullptr;
-
-                    if (uploadManager->suballocateBuffer(sizeof(vk::TransformMatrixKHR), &uploadBuffer, &uploadOffset,
-                        &uploadCpuVA, currentVersion, uint32_t(TransformAlignment)))
-                    {
-                        static_assert(sizeof(vk::TransformMatrixKHR) == sizeof(rt::AffineTransform),
-                            "The sizes of different transform types must match");
-                        memcpy(uploadCpuVA, &src.transform, sizeof(vk::TransformMatrixKHR));
-                        dstt.setTransformData(getBufferAddress(uploadBuffer, uploadOffset));
-                    }
-                    else
-                    {
-                        context.error("Couldn't suballocate an upload buffer for geometry transform.");
-                        return;
-                    }
+                    dstt.setTransformData(vk::DeviceOrHostAddressConstKHR().setDeviceAddress(
+                        checked_cast<Buffer*>(src.transformBuffer)->deviceAddress + src.transformBufferOffset));
                 }
                 else
                 {
-                    // For build size queries, set a non-null dummy address for the transform.
-                    // https://registry.khronos.org/vulkan/specs/latest/man/html/vkGetAccelerationStructureBuildSizesKHR.html
-                    //
-                    // >> The srcAccelerationStructure, dstAccelerationStructure, and mode members of pBuildInfo are
-                    //    ignored. Any VkDeviceOrHostAddressKHR or VkDeviceOrHostAddressConstKHR members of pBuildInfo
-                    //    are ignored by this command, except that the hostAddress member of
-                    //    VkAccelerationStructureGeometryTrianglesDataKHR::transformData will be examined to check
-                    //    if it is NULL.
-                    dstt.setTransformData(vk::DeviceOrHostAddressConstKHR().setHostAddress((void*)TransformAlignment));
+                    // The alignment of the transforms is supposed to be 16 bytes, as reported by the validation layer,
+                    // but there doesn't seem to be the appropriate constant or device property.
+                    constexpr size_t TransformAlignment = 16;
+
+                    if (uploadManager)
+                    {
+                        // Suballocate a small piece of the upload buffer to copy the transform to the GPU.
+                        Buffer* uploadBuffer = nullptr;
+                        uint64_t uploadOffset = 0;
+                        void* uploadCpuVA = nullptr;
+
+                        if (uploadManager->suballocateBuffer(sizeof(vk::TransformMatrixKHR), &uploadBuffer, &uploadOffset,
+                            &uploadCpuVA, currentVersion, uint32_t(TransformAlignment)))
+                        {
+                            static_assert(sizeof(vk::TransformMatrixKHR) == sizeof(rt::AffineTransform),
+                                "The sizes of different transform types must match");
+                            memcpy(uploadCpuVA, &src.transform, sizeof(vk::TransformMatrixKHR));
+                            dstt.setTransformData(getBufferAddress(uploadBuffer, uploadOffset));
+                        }
+                        else
+                        {
+                            context.error("Couldn't suballocate an upload buffer for geometry transform.");
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        // For build size queries, set a non-null dummy address for the transform.
+                        // https://registry.khronos.org/vulkan/specs/latest/man/html/vkGetAccelerationStructureBuildSizesKHR.html
+                        //
+                        // >> The srcAccelerationStructure, dstAccelerationStructure, and mode members of pBuildInfo are
+                        //    ignored. Any VkDeviceOrHostAddressKHR or VkDeviceOrHostAddressConstKHR members of pBuildInfo
+                        //    are ignored by this command, except that the hostAddress member of
+                        //    VkAccelerationStructureGeometryTrianglesDataKHR::transformData will be examined to check
+                        //    if it is NULL.
+                        dstt.setTransformData(vk::DeviceOrHostAddressConstKHR().setHostAddress((void*)TransformAlignment));
+                    }
                 }
             }
 
@@ -773,6 +781,8 @@ namespace nvrhi::vulkan
                         requireBufferState(srct.vertexBuffer, nvrhi::ResourceStates::AccelStructBuildInput);
                     if (OpacityMicromap* om = checked_cast<OpacityMicromap*>(srct.opacityMicromap))
                         requireBufferState(om->dataBuffer, nvrhi::ResourceStates::AccelStructBuildInput);
+                    if (src.transformBuffer)
+                        requireBufferState(src.transformBuffer, nvrhi::ResourceStates::AccelStructBuildInput);
                 }
                 break;
             }
