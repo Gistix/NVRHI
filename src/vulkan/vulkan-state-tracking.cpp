@@ -56,6 +56,7 @@ namespace nvrhi::vulkan
                         : shaderResourceState;
                     requireTextureState(texture, binding.subresources, srvState);
                     break;
+                }
 
                 case ResourceType::Texture_UAV:
                     requireTextureState(checked_cast<ITexture*>(binding.resourceHandle), binding.subresources, ResourceStates::UnorderedAccess);
