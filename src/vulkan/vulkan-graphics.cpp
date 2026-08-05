@@ -221,6 +221,12 @@ namespace nvrhi::vulkan
             return nullptr;
         }
 
+        if (desc.useIndirectPushConstant)
+        {
+            m_Context.error("useIndirectPushConstant is not supported by the Vulkan backend");
+            return nullptr;
+        }
+
         vk::Result res;
 
         InputLayout* inputLayout = checked_cast<InputLayout*>(desc.inputLayout.Get());
