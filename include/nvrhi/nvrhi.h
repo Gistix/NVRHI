@@ -2536,6 +2536,23 @@ namespace nvrhi
         VariableRateShadingState shadingRateState;
 
         BindingLayoutVector bindingLayouts;
+
+        // When set, the first 32-bit value of the push constants block is fetched from the
+        // indirect argument buffer on each drawIndirect call instead of being set via
+        // setPushConstants. Supported by the D3D12 backend only; other backends reject the
+        // pipeline at creation time.
+        //
+        // Buffer layout per entry (20 bytes stride):
+        //   DWORD 0      : value written to push constant offset 0
+        //   DrawArgs[16] : D3D12_DRAW_ARGUMENTS (VertexCountPerInstance, InstanceCount,
+        //                  StartVertexLocation, StartInstanceLocation)
+        //
+        // Only the first 32-bit value is written by the GPU; any push constant bytes beyond
+        // the first 4 retain the values from the last setPushConstants call, so a push
+        // constant size of 4 bytes is recommended. Only affects drawIndirect (non-indexed).
+        // When set, the validation layer skips the "push constants not set" check for
+        // drawIndirect on this pipeline.
+        bool useIndirectPushConstant = false;
         
         GraphicsPipelineDesc& setPrimType(PrimitiveType value) { primType = value; return *this; }
         GraphicsPipelineDesc& setPatchControlPoints(uint32_t value) { patchControlPoints = value; return *this; }
@@ -2551,6 +2568,10 @@ namespace nvrhi
         GraphicsPipelineDesc& setRenderState(const RenderState& value) { renderState = value; return *this; }
         GraphicsPipelineDesc& setVariableRateShadingState(const VariableRateShadingState& value) { shadingRateState = value; return *this; }
         GraphicsPipelineDesc& addBindingLayout(IBindingLayout* layout) { bindingLayouts.push_back(layout); return *this; }
+        /// Fetches the first 32-bit push constant value from the indirect argument buffer on
+        /// each drawIndirect call. See the useIndirectPushConstant member comment for the
+        /// buffer layout and backend support.
+        GraphicsPipelineDesc& setUseIndirectPushConstant(bool value) { useIndirectPushConstant = value; return *this; }
     };
 
     class IGraphicsPipeline : public IResource

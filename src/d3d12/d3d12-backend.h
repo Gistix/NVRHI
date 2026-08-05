@@ -582,6 +582,7 @@ namespace nvrhi::d3d12
 
         RefCountPtr<RootSignature> rootSignature;
         RefCountPtr<ID3D12PipelineState> pipelineState;
+        RefCountPtr<ID3D12CommandSignature> indirectCommandSignature;
 
         bool requiresBlendFactor = false;
         

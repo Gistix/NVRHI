@@ -60,6 +60,12 @@ namespace nvrhi::d3d11
             return nullptr;
         }
 
+        if (desc.useIndirectPushConstant)
+        {
+            m_Context.error("useIndirectPushConstant is not supported by the D3D11 backend");
+            return nullptr;
+        }
+
         GraphicsPipeline *pso = new GraphicsPipeline();
         pso->desc = desc;
         pso->framebufferInfo = fbinfo;

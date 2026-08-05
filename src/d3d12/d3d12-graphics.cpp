@@ -212,6 +212,33 @@ namespace nvrhi::d3d12
         pso->pipelineState = pipelineState;
         pso->requiresBlendFactor = desc.renderState.blendState.usesConstantColor(uint32_t(pso->framebufferInfo.colorFormats.size()));
         
+        if (desc.useIndirectPushConstant)
+        {
+            if (pso->rootSignature->rootParameterPushConstants != c_InvalidRootParameterIndex)
+            {
+                D3D12_INDIRECT_ARGUMENT_DESC argDescs[2] = {};
+                argDescs[0].Type = D3D12_INDIRECT_ARGUMENT_TYPE_CONSTANT;
+                argDescs[0].Constant.RootParameterIndex = pso->rootSignature->rootParameterPushConstants;
+                argDescs[0].Constant.DestOffsetIn32BitValues = 0;
+                argDescs[0].Constant.Num32BitValuesToSet = 1;
+
+                argDescs[1].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW;
+
+                D3D12_COMMAND_SIGNATURE_DESC csDesc = {};
+                csDesc.ByteStride = 20; // 4 bytes constant + 16 bytes DrawArguments
+                csDesc.NumArgumentDescs = 2;
+                csDesc.pArgumentDescs = argDescs;
+
+                HRESULT hr = m_Context.device->CreateCommandSignature(&csDesc, pso->rootSignature->handle, IID_PPV_ARGS(&pso->indirectCommandSignature));
+                if (FAILED(hr))
+                    m_Context.error("Failed to create an indirect command signature for the push constant");
+            }
+            else
+            {
+                m_Context.error("useIndirectPushConstant requires a push constants binding in the pipeline");
+            }
+        }
+
         return GraphicsPipelineHandle::Create(pso);
     }
 
@@ -580,7 +607,21 @@ namespace nvrhi::d3d12
 
         updateGraphicsVolatileBuffers();
 
-        m_ActiveCommandList->commandList->ExecuteIndirect(m_Context.drawIndirectSignature, drawCount, indirectParams->resource, offsetBytes, nullptr, 0);
+        GraphicsPipeline* pso = checked_cast<GraphicsPipeline*>(m_CurrentGraphicsState.pipeline);
+        if (pso && pso->desc.useIndirectPushConstant)
+        {
+            if (!pso->indirectCommandSignature)
+            {
+                m_Context.error("drawIndirect: the pipeline uses an indirect push constant, but its command signature could not be created");
+                return;
+            }
+
+            m_ActiveCommandList->commandList->ExecuteIndirect(pso->indirectCommandSignature.Get(), drawCount, indirectParams->resource, offsetBytes, nullptr, 0);
+        }
+        else
+        {
+            m_ActiveCommandList->commandList->ExecuteIndirect(m_Context.drawIndirectSignature.Get(), drawCount, indirectParams->resource, offsetBytes, nullptr, 0);
+        }
     }
 
     void CommandList::drawIndexedIndirect(uint32_t offsetBytes, uint32_t drawCount)

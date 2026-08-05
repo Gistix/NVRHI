@@ -182,7 +182,7 @@ namespace nvrhi::validation
         ICommandList* getUnderlyingCommandList() const { return m_CommandList; }
 
         void evaluatePushConstantSize(const nvrhi::BindingLayoutVector& bindingLayouts);
-        bool validatePushConstants(const char* pipelineType, const char* stateFunctionName) const;
+        bool validatePushConstants(const char* pipelineType, const char* stateFunctionName, bool allowIndirectPushConstant = false) const;
         bool validateBindingSetsAgainstLayouts(const static_vector<BindingLayoutHandle, c_MaxBindingLayouts>& layouts, const static_vector<IBindingSet*, c_MaxBindingLayouts>& sets) const;
 
         bool validateBuildTopLevelAccelStruct(AccelStructWrapper* wrapper, size_t numInstances, rt::AccelStructBuildFlags buildFlags) const;

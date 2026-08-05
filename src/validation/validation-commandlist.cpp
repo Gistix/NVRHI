@@ -729,7 +729,7 @@ namespace nvrhi::validation
             return;
         }
 
-        if (!validatePushConstants("graphics", "setGraphicsState"))
+        if (!validatePushConstants("graphics", "setGraphicsState", true))
             return;
 
         m_CommandList->drawIndirect(offsetBytes, drawCount);
@@ -1926,8 +1926,11 @@ namespace nvrhi::validation
         }
     }
 
-    bool CommandListWrapper::validatePushConstants(const char* pipelineType, const char* stateFunctionName) const
+    bool CommandListWrapper::validatePushConstants(const char* pipelineType, const char* stateFunctionName, bool allowIndirectPushConstant) const
     {
+        if (allowIndirectPushConstant && m_CurrentGraphicsState.pipeline && m_CurrentGraphicsState.pipeline->getDesc().useIndirectPushConstant)
+            return true;
+
         if (m_PipelinePushConstantSize != 0 && !m_PushConstantsSet)
         {
             std::stringstream ss;
