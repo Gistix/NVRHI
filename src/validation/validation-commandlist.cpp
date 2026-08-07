@@ -429,19 +429,30 @@ namespace nvrhi::validation
 
         if (dataSize + destOffsetBytes > b->getDesc().byteSize)
         {
-            error("writeBuffer: dataSize + destOffsetBytes is greater than the buffer size");
+            std::ostringstream oss;
+            oss << "writeBuffer: dataSize + destOffsetBytes is greater than the buffer size"
+                << " (buffer '" << b->getDesc().debugName << "', dataSize=" << dataSize
+                << ", destOffsetBytes=" << destOffsetBytes
+                << ", byteSize=" << b->getDesc().byteSize << ")";
+            error(oss.str());
             return;
         }
 
         if (destOffsetBytes > 0 && b->getDesc().isVolatile)
         {
-            error("writeBuffer: cannot write into volatile buffers with an offset");
+            std::ostringstream oss;
+            oss << "writeBuffer: cannot write into volatile buffers with an offset"
+                << " (buffer '" << b->getDesc().debugName << "')";
+            error(oss.str());
             return;
         }
 
         if (dataSize > 0x10000 && b->getDesc().isVolatile)
         {
-            error("writeBuffer: cannot write more than 65535 bytes into volatile buffers");
+            std::ostringstream oss;
+            oss << "writeBuffer: cannot write more than 65535 bytes into volatile buffers"
+                << " (buffer '" << b->getDesc().debugName << "', dataSize=" << dataSize << ")";
+            error(oss.str());
             return;
         }
 
