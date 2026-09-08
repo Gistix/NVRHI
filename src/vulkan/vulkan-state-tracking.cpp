@@ -211,7 +211,8 @@ namespace nvrhi::vulkan
             ResourceStateMapping before = convertResourceState(barrier.stateBefore, true);
             ResourceStateMapping after = convertResourceState(barrier.stateAfter, true);
 
-            assert(after.imageLayout != vk::ImageLayout::eUndefined);
+            if (after.imageLayout == vk::ImageLayout::eUndefined)
+                continue;
 
             Texture* texture = static_cast<Texture*>(barrier.texture);
 
