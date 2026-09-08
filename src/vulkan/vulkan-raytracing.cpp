@@ -278,7 +278,10 @@ namespace nvrhi::vulkan
 
         if (pRange)
         {
-            pRange->setPrimitiveCount(maxPrimitiveCount);
+            pRange->primitiveCount = maxPrimitiveCount;
+            pRange->primitiveOffset = 0;
+            pRange->firstVertex = 0;
+            pRange->transformOffset = 0;
         }
 
         vk::GeometryFlagsKHR geometryFlags = vk::GeometryFlagBitsKHR(0);
@@ -773,6 +776,15 @@ namespace nvrhi::vulkan
             {
             case rt::GeometryType::Triangles: {
                 const rt::GeometryTriangles& srct = src.geometryData.triangles;
+                if (srct.indexBuffer)
+                    m_CurrentCmdBuf->referencedResources.push_back(srct.indexBuffer);
+                if (srct.vertexBuffer)
+                    m_CurrentCmdBuf->referencedResources.push_back(srct.vertexBuffer);
+                if (OpacityMicromap* om = checked_cast<OpacityMicromap*>(srct.opacityMicromap))
+                    m_CurrentCmdBuf->referencedResources.push_back(om->dataBuffer);
+                if (src.transformBuffer)
+                    m_CurrentCmdBuf->referencedResources.push_back(src.transformBuffer);
+
                 if (m_EnableAutomaticBarriers)
                 {
                     if (srct.indexBuffer)
@@ -788,6 +800,8 @@ namespace nvrhi::vulkan
             }
             case rt::GeometryType::AABBs: {
                 const rt::GeometryAABBs& srca = src.geometryData.aabbs;
+                if (srca.buffer)
+                    m_CurrentCmdBuf->referencedResources.push_back(srca.buffer);
                 if (m_EnableAutomaticBarriers)
                 {
                     if (srca.buffer)
@@ -800,6 +814,10 @@ namespace nvrhi::vulkan
                 break;
             case rt::GeometryType::Lss: {
                 const rt::GeometryLss& srcLss = src.geometryData.lss;
+                if (srcLss.indexBuffer)
+                    m_CurrentCmdBuf->referencedResources.push_back(srcLss.indexBuffer);
+                if (srcLss.vertexBuffer)
+                    m_CurrentCmdBuf->referencedResources.push_back(srcLss.vertexBuffer);
                 if (m_EnableAutomaticBarriers)
                 {
                     if (srcLss.indexBuffer)
@@ -914,6 +932,8 @@ namespace nvrhi::vulkan
 
         m_CurrentCmdBuf->cmdBuf.buildAccelerationStructuresKHR(buildInfos, buildRangeArrays);
 #endif
+        if (as->dataBuffer)
+            m_CurrentCmdBuf->referencedResources.push_back(as->dataBuffer);
         if (as->desc.trackLiveness)
             m_CurrentCmdBuf->referencedResources.push_back(as);
     }
@@ -1032,6 +1052,9 @@ namespace nvrhi::vulkan
             if (src.bottomLevelAS)
             {
                 AccelStruct* blas = checked_cast<AccelStruct*>(src.bottomLevelAS);
+                m_CurrentCmdBuf->referencedResources.push_back(blas);
+                if (blas->dataBuffer)
+                    m_CurrentCmdBuf->referencedResources.push_back(blas->dataBuffer);
 #ifdef NVRHI_WITH_RTXMU
                 blas->rtxmuBuffer = m_Context.rtxMemUtil->GetBuffer(blas->rtxmuId);
                 blas->accelStruct = m_Context.rtxMemUtil->GetAccelerationStruct(blas->rtxmuId);
@@ -1085,6 +1108,8 @@ namespace nvrhi::vulkan
 
         buildTopLevelAccelStructInternal(as, uploadBuffer->deviceAddress + uploadOffset, numInstances, buildFlags, currentVersion);
 
+        if (as->dataBuffer)
+            m_CurrentCmdBuf->referencedResources.push_back(as->dataBuffer);
         if (as->desc.trackLiveness)
             m_CurrentCmdBuf->referencedResources.push_back(as);
     }
