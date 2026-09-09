@@ -1858,7 +1858,9 @@ namespace nvrhi::vulkan
             .setAllowClusterAccelerationStructure(desc.allowClusters);
 
         auto pipelineFlags2 = vk::PipelineCreateFlags2CreateInfoKHR();
-        if (m_Context.extensions.NV_ray_tracing_linear_swept_spheres)
+        const bool allowSpheresAndLinearSweptSpheres = m_Context.extensions.NV_ray_tracing_linear_swept_spheres
+            && m_Context.linearSweptSpheresFeatures.spheres;
+        if (allowSpheresAndLinearSweptSpheres)
         {
             pipelineFlags2.setFlags(vk::PipelineCreateFlagBits2::eRayTracingAllowSpheresAndLinearSweptSpheresNV);
         }
@@ -1867,7 +1869,7 @@ namespace nvrhi::vulkan
 #define APPEND_EXTENSION(condition, desc) if (condition) { (desc).pNext = pNext; pNext = &(desc); }
         void* pNext = nullptr;
         APPEND_EXTENSION(m_Context.extensions.NV_cluster_acceleration_structure, pipelineClusters);
-        APPEND_EXTENSION(m_Context.extensions.NV_ray_tracing_linear_swept_spheres, pipelineFlags2);
+        APPEND_EXTENSION(allowSpheresAndLinearSweptSpheres, pipelineFlags2);
 #undef APPEND_EXTENSION
 
         auto pipelineInfo = vk::RayTracingPipelineCreateInfoKHR()
