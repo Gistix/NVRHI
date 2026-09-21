@@ -1752,7 +1752,14 @@ namespace nvrhi::vulkan
             pNext = &pipelineFlags2;
         }
 
+        vk::PipelineCreateFlags pipelineFlags = {};
+        if (desc.allowOpacityMicromaps && m_Context.extensions.EXT_opacity_micromap)
+        {
+            pipelineFlags |= vk::PipelineCreateFlagBits::eRayTracingOpacityMicromapEXT;
+        }
+
         auto pipelineInfo = vk::RayTracingPipelineCreateInfoKHR()
+            .setFlags(pipelineFlags)
             .setStages(shaderStages)
             .setGroups(shaderGroups)
             .setLayout(pso->pipelineLayout)
