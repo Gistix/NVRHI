@@ -232,11 +232,6 @@ namespace nvrhi::vulkan
 
             m_Context.rtxMuResources = std::make_unique<RtxMuResources>();
         }
-
-        if (m_Context.extensions.EXT_opacity_micromap)
-        {
-            m_Context.warning("Opacity micro-maps are not currently supported by RTXMU.");
-        }
 #endif
         auto pipelineInfo = vk::PipelineCacheCreateInfo();
         vk::Result res = m_Context.device.createPipelineCache(&pipelineInfo,
@@ -343,11 +338,7 @@ namespace nvrhi::vulkan
         case Feature::RayTracingPipeline:
             return m_Context.extensions.KHR_ray_tracing_pipeline;
         case Feature::RayTracingOpacityMicromap:
-#ifdef NVRHI_WITH_RTXMU
-            return false; // RTXMU does not support OMMs
-#else
             return m_Context.extensions.EXT_opacity_micromap;
-#endif
         case Feature::RayQuery:
             return m_Context.extensions.KHR_ray_query;
         case Feature::ShaderExecutionReordering:
