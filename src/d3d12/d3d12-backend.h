@@ -1238,6 +1238,7 @@ namespace nvrhi::d3d12
         rt::cluster::OperationSizeInfo getClusterOperationSizeInfo(const rt::cluster::OperationParams& params) override;
 
         bool bindAccelStructMemory(rt::IAccelStruct* as, IHeap* heap, uint64_t offset) override;
+        bool getAccelStructMemoryStats(rt::AccelStructMemoryStats& outStats) override;
 
         nvrhi::CommandListHandle createCommandList(const CommandListParameters& params = CommandListParameters()) override;
         uint64_t executeCommandLists(nvrhi::ICommandList* const* pCommandLists, size_t numCommandLists, CommandQueue executionQueue = CommandQueue::Graphics) override;

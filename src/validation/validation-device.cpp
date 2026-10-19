@@ -2340,6 +2340,11 @@ namespace nvrhi::validation
         return m_Device->bindAccelStructMemory(as, heap, offset);
     }
 
+    bool DeviceWrapper::getAccelStructMemoryStats(rt::AccelStructMemoryStats& outStats)
+    {
+        return m_Device->getAccelStructMemoryStats(outStats);
+    }
+
     CommandListHandle DeviceWrapper::createCommandList(const CommandListParameters& params)
     {
         switch(params.queueType)

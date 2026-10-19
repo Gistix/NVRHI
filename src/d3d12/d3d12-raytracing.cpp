@@ -1003,6 +1003,30 @@ namespace nvrhi::d3d12
         return false;
     }
 
+    bool Device::getAccelStructMemoryStats(rt::AccelStructMemoryStats& outStats)
+    {
+#ifdef NVRHI_WITH_RTXMU
+        if (!m_Context.rtxMemUtil)
+            return false;
+
+        auto compStats      = m_Context.rtxMemUtil->GetCompactionPoolMemoryStats();
+        auto resultStats    = m_Context.rtxMemUtil->GetResultPoolMemoryStats();
+        auto transientStats = m_Context.rtxMemUtil->GetTransientResultPoolMemoryStats();
+        auto scratchStats   = m_Context.rtxMemUtil->GetScratchPoolMemoryStats();
+        auto updateStats    = m_Context.rtxMemUtil->GetUpdatePoolMemoryStats();
+
+        outStats.compactionPoolSize      = compStats.totalResidentMemorySize;
+        outStats.resultPoolSize          = resultStats.totalResidentMemorySize;
+        outStats.transientResultPoolSize = transientStats.totalResidentMemorySize;
+        outStats.scratchPoolSize         = scratchStats.totalResidentMemorySize;
+        outStats.updatePoolSize          = updateStats.totalResidentMemorySize;
+        return true;
+#else
+        (void)outStats;
+        return false;
+#endif
+    }
+
     void AccelStruct::createSRV(size_t descriptor) const
     {
         D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc;
