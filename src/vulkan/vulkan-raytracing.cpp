@@ -421,6 +421,12 @@ namespace nvrhi::vulkan
         as->desc = desc;
         as->allowUpdate = (desc.buildFlags & rt::AccelStructBuildFlags::AllowUpdate) != 0;
 
+        if (!desc.isTopLevel)
+        {
+            auto prebuildInfo = getAccelStructPreBuildInfo(desc);
+            as->prebuildSize = prebuildInfo.resultBytes;
+        }
+
 #ifdef NVRHI_WITH_RTXMU
         bool isManaged = desc.isTopLevel;
 #else
@@ -1421,6 +1427,26 @@ namespace nvrhi::vulkan
     {
         if (dataBuffer)
             return dataBuffer->getDesc().byteSize;
+
+#ifdef NVRHI_WITH_RTXMU
+        if (!desc.isTopLevel && rtxmuId != ~0ull && m_Context.rtxMemUtil)
+        {
+            if (m_Context.rtxMemUtil->IsValid(rtxmuId))
+            {
+                uint64_t size = 0;
+                if (m_Context.rtxMemUtil->GetCompactionComplete(rtxmuId))
+                    size = m_Context.rtxMemUtil->GetCompactedAccelStructSize(rtxmuId);
+                else
+                    size = m_Context.rtxMemUtil->GetInitialAccelStructSize(rtxmuId);
+
+                if (size > 0)
+                    return size;
+            }
+        }
+
+        if (!desc.isTopLevel && prebuildSize > 0)
+            return prebuildSize;
+#endif
 
         return 0;
     }

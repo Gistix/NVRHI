@@ -1050,6 +1050,7 @@ namespace nvrhi::vulkan
         bool compacted = false;
         size_t rtxmuId = ~0ull;
         vk::Buffer rtxmuBuffer;
+        uint64_t prebuildSize = 0;
 
 
         explicit AccelStruct(const VulkanContext& context)
