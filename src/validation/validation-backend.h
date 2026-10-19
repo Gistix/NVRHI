@@ -395,6 +395,7 @@ namespace nvrhi::validation
         MemoryRequirements getAccelStructMemoryRequirements(rt::IAccelStruct* as) override;
         rt::cluster::OperationSizeInfo getClusterOperationSizeInfo(const rt::cluster::OperationParams& params) override;
         bool bindAccelStructMemory(rt::IAccelStruct* as, IHeap* heap, uint64_t offset) override;
+        bool getAccelStructMemoryStats(rt::AccelStructMemoryStats& outStats) override;
 
         CommandListHandle createCommandList(const CommandListParameters& params = CommandListParameters()) override;
         uint64_t executeCommandLists(ICommandList* const* pCommandLists, size_t numCommandLists, CommandQueue executionQueue = CommandQueue::Graphics) override;

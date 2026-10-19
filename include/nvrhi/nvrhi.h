@@ -1830,6 +1830,15 @@ namespace nvrhi
             AccelStructDesc& setIsVirtual(bool value) { isVirtual = value; return *this; }
         };
 
+        struct AccelStructMemoryStats
+        {
+            uint64_t compactionPoolSize = 0;
+            uint64_t resultPoolSize = 0;
+            uint64_t transientResultPoolSize = 0;
+            uint64_t scratchPoolSize = 0;
+            uint64_t updatePoolSize = 0;
+        };
+
         //////////////////////////////////////////////////////////////////////////
         // rt::AccelStruct
         //////////////////////////////////////////////////////////////////////////
@@ -3956,6 +3965,7 @@ namespace nvrhi
         virtual MemoryRequirements getAccelStructMemoryRequirements(rt::IAccelStruct* as) = 0;
         virtual rt::cluster::OperationSizeInfo getClusterOperationSizeInfo(const rt::cluster::OperationParams& params) = 0;
         virtual bool bindAccelStructMemory(rt::IAccelStruct* as, IHeap* heap, uint64_t offset) = 0;
+        virtual bool getAccelStructMemoryStats(rt::AccelStructMemoryStats& outStats) { (void)outStats; return false; }
         
         virtual CommandListHandle createCommandList(const CommandListParameters& params = CommandListParameters()) = 0;
         virtual uint64_t executeCommandLists(ICommandList* const* pCommandLists, size_t numCommandLists, CommandQueue executionQueue = CommandQueue::Graphics) = 0;
