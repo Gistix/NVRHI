@@ -779,6 +779,7 @@ namespace nvrhi::d3d12
 #ifdef NVRHI_WITH_RTXMU
         D3D12_GPU_VIRTUAL_ADDRESS rtxmuGpuVA = 0;
 #endif
+        uint64_t prebuildSize = 0;
 
         AccelStruct(const Context& context)
             : m_Context(context)

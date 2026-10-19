@@ -491,6 +491,26 @@ namespace nvrhi::d3d12
         if (dataBuffer)
             return dataBuffer->desc.byteSize;
 
+#ifdef NVRHI_WITH_RTXMU
+        if (!desc.isTopLevel && rtxmuId != ~0ull && m_Context.rtxMemUtil)
+        {
+            if (m_Context.rtxMemUtil->IsValid(rtxmuId))
+            {
+                uint64_t size = 0;
+                if (m_Context.rtxMemUtil->GetCompactionComplete(rtxmuId))
+                    size = m_Context.rtxMemUtil->GetCompactedAccelStructSize(rtxmuId);
+                else
+                    size = m_Context.rtxMemUtil->GetInitialAccelStructSize(rtxmuId);
+
+                if (size > 0)
+                    return size;
+            }
+        }
+
+        if (!desc.isTopLevel && prebuildSize > 0)
+            return prebuildSize;
+#endif
+
         return 0;
     }
 
@@ -913,6 +933,7 @@ namespace nvrhi::d3d12
         AccelStruct* as = new AccelStruct(m_Context);
         as->desc = desc;
         as->allowUpdate = (desc.buildFlags & rt::AccelStructBuildFlags::AllowUpdate) != 0;
+        as->prebuildSize = ASPreBuildInfo.ResultDataMaxSizeInBytes;
 
         assert(ASPreBuildInfo.ResultDataMaxSizeInBytes <= ~0u);
 
