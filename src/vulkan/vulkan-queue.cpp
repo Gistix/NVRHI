@@ -309,6 +309,8 @@ namespace nvrhi::vulkan
 #ifdef NVRHI_WITH_RTXMU
                 if (!cmd->rtxmuBuildIds.empty())
                 {
+                    m_Context.rtxMemUtil->ReleaseBuildScratch(cmd->rtxmuBuildIds);
+
                     std::lock_guard lockGuard(m_Context.rtxMuResources->asListMutex);
                     
                     m_Context.rtxMuResources->asBuildsCompleted.insert(m_Context.rtxMuResources->asBuildsCompleted.end(),

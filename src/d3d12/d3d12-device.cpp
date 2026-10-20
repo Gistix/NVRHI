@@ -577,6 +577,8 @@ namespace nvrhi::d3d12
 #ifdef NVRHI_WITH_RTXMU
                     if (!instance->rtxmuBuildIds.empty())
                     {
+                        m_Context.rtxMemUtil->ReleaseBuildScratch(instance->rtxmuBuildIds);
+
                         std::lock_guard lockGuard(m_Resources.asListMutex);
 
                         m_Resources.asBuildsCompleted.insert(m_Resources.asBuildsCompleted.end(),
