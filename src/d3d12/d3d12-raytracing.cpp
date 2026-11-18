@@ -893,9 +893,9 @@ namespace nvrhi::d3d12
 
         D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO ASPreBuildInfo = {};
         if (GetAccelStructPreBuildInfo(ASPreBuildInfo, desc)) {
-			prebuildInfo.resultMaxSizeInBytes = ASPreBuildInfo.ResultDataMaxSizeInBytes;
-			prebuildInfo.scratchSizeInBytes = ASPreBuildInfo.ScratchDataSizeInBytes;
-			prebuildInfo.updateScratchSizeInBytes = ASPreBuildInfo.UpdateScratchDataSizeInBytes;
+			prebuildInfo.resultBytes = ASPreBuildInfo.ResultDataMaxSizeInBytes;
+			prebuildInfo.scratchBytes = ASPreBuildInfo.ScratchDataSizeInBytes;
+			prebuildInfo.updateScratchBytes = ASPreBuildInfo.UpdateScratchDataSizeInBytes;
         }
 
         return prebuildInfo;

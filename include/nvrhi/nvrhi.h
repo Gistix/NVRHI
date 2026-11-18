@@ -1827,13 +1827,6 @@ namespace nvrhi
             AccelStructDesc& setIsVirtual(bool value) { isVirtual = value; return *this; }
         };
 
-		struct AccelStructPrebuildInfo
-		{
-            uint64_t resultMaxSizeInBytes = 0;
-            uint64_t scratchSizeInBytes = 0;
-			uint64_t updateScratchSizeInBytes = 0;
-		};
-
         //////////////////////////////////////////////////////////////////////////
         // rt::AccelStruct
         //////////////////////////////////////////////////////////////////////////
