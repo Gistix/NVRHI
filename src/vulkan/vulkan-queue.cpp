@@ -133,7 +133,9 @@ namespace nvrhi::vulkan
 
         for (size_t i = 0; i < m_WaitSemaphores.size(); i++)
         {
-            waitStageArray[i] = vk::PipelineStageFlagBits::eTopOfPipe;
+            // Not TOP_OF_PIPE: as a wait stage it has an empty access scope,
+            // so the signalling queue's writes would not be made visible.
+            waitStageArray[i] = vk::PipelineStageFlagBits::eAllCommands;
         }
 
         uint64_t const submissionID = ++m_LastSubmittedID;
