@@ -1907,12 +1907,18 @@ namespace nvrhi::vulkan
         auto pipelineClusters = vk::RayTracingPipelineClusterAccelerationStructureCreateInfoNV()
             .setAllowClusterAccelerationStructure(desc.allowClusters);
 
+        // Tracing acceleration structures that use opacity micromaps requires the OMM pipeline flag.
+        const bool allowOpacityMicromaps = desc.allowOpacityMicromaps && m_Context.extensions.EXT_opacity_micromap;
+
         auto pipelineFlags2 = vk::PipelineCreateFlags2CreateInfoKHR();
         const bool allowSpheresAndLinearSweptSpheres = m_Context.extensions.NV_ray_tracing_linear_swept_spheres
             && m_Context.linearSweptSpheresFeatures.spheres;
         if (allowSpheresAndLinearSweptSpheres)
         {
-            pipelineFlags2.setFlags(vk::PipelineCreateFlagBits2::eRayTracingAllowSpheresAndLinearSweptSpheresNV);
+            vk::PipelineCreateFlags2KHR flags2 = vk::PipelineCreateFlagBits2::eRayTracingAllowSpheresAndLinearSweptSpheresNV;
+            if (allowOpacityMicromaps)
+                flags2 |= vk::PipelineCreateFlagBits2::eRayTracingOpacityMicromapEXT;
+            pipelineFlags2.setFlags(flags2);
         }
 
         // Build the linked list of extension structures
@@ -1929,6 +1935,10 @@ namespace nvrhi::vulkan
             .setMaxPipelineRayRecursionDepth(desc.maxRecursionDepth)
             .setPLibraryInfo(&libraryInfo)
             .setPNext(pNext);
+
+        // A chained VkPipelineCreateFlags2CreateInfoKHR replaces these flags, so only set them without it.
+        if (allowOpacityMicromaps && !allowSpheresAndLinearSweptSpheres)
+            pipelineInfo.setFlags(vk::PipelineCreateFlagBits::eRayTracingOpacityMicromapEXT);
 
         res = m_Context.device.createRayTracingPipelinesKHR(vk::DeferredOperationKHR(), m_Context.pipelineCache,
             1, &pipelineInfo,
