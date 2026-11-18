@@ -1300,6 +1300,7 @@ namespace nvrhi::vulkan
         
         void buildOpacityMicromap(rt::IOpacityMicromap* omm, const rt::OpacityMicromapDesc& desc) override;
         void buildBottomLevelAccelStruct(rt::IAccelStruct* as, const rt::GeometryDesc* pGeometries, size_t numGeometries, rt::AccelStructBuildFlags buildFlags) override;
+        void buildBottomLevelAccelStructs(const rt::BottomLevelAccelStructBuild* pBuilds, size_t numBuilds) override;
         void compactBottomLevelAccelStructs() override;
         void copyRaytracingAccelerationStructure(rt::IAccelStruct* destination, rt::IAccelStruct* source) override;
         void buildTopLevelAccelStruct(rt::IAccelStruct* as, const rt::InstanceDesc* pInstances, size_t numInstances, rt::AccelStructBuildFlags buildFlags) override;

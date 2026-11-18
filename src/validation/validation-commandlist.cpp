@@ -1304,14 +1304,9 @@ namespace nvrhi::validation
         m_CommandList->buildOpacityMicromap(omm, desc);
     }
 
-    void CommandListWrapper::buildBottomLevelAccelStruct(rt::IAccelStruct* as, const rt::GeometryDesc* pGeometries, size_t numGeometries, rt::AccelStructBuildFlags buildFlags)
+    bool CommandListWrapper::validateBuildBottomLevelAccelStruct(rt::IAccelStruct* as, const rt::GeometryDesc* pGeometries,
+        size_t numGeometries, rt::AccelStructBuildFlags buildFlags, rt::IAccelStruct*& outUnderlyingAS)
     {
-        if (!requireOpenState())
-            return;
-
-        if (!requireType(CommandQueue::Compute, "buildBottomLevelAccelStruct"))
-            return;
-
         rt::IAccelStruct* underlyingAS = as;
 
         AccelStructWrapper* wrapper = dynamic_cast<AccelStructWrapper*>(as);
@@ -1322,7 +1317,7 @@ namespace nvrhi::validation
             if (wrapper->isTopLevel)
             {
                 error("Cannot perform buildBottomLevelAccelStruct on a top-level AS");
-                return;
+                return false;
             }
             
             for (size_t i = 0; i < numGeometries; i++)
@@ -1344,7 +1339,7 @@ namespace nvrhi::validation
                                 ss << "BLAS " << utils::DebugNameToString(as->getDesc().debugName) << " build geometry " << i
                                     << " has index format R8_UINT which is only supported on Vulkan";
                                 error(ss.str());
-                                return;
+                                return false;
                             }
                             break;
                         case Format::R16_UINT:
@@ -1355,7 +1350,7 @@ namespace nvrhi::validation
                             ss << "BLAS " << utils::DebugNameToString(as->getDesc().debugName) << " build geometry " << i
                                 << " has unsupported index format: " << utils::FormatToString(triangles.indexFormat);
                             error(ss.str());
-                            return;
+                            return false;
                         }
                         }
 
@@ -1365,7 +1360,7 @@ namespace nvrhi::validation
                             ss << "BLAS " << utils::DebugNameToString(as->getDesc().debugName) << " build geometry " << i
                                 << " has a NULL index buffer but indexFormat is " << utils::FormatToString(triangles.indexFormat);
                             error(ss.str());
-                            return;
+                            return false;
                         }
 
                         const BufferDesc& indexBufferDesc = triangles.indexBuffer->getDesc();
@@ -1376,7 +1371,7 @@ namespace nvrhi::validation
                                 << " has index buffer = " << utils::DebugNameToString(indexBufferDesc.debugName)
                                 << " which does not have the isAccelStructBuildInput flag set";
                             error(ss.str());
-                            return;
+                            return false;
                         }
 
                         const size_t indexSize = triangles.indexCount * getFormatInfo(triangles.indexFormat).bytesPerBlock;
@@ -1388,7 +1383,7 @@ namespace nvrhi::validation
                                 << " in buffer " << utils::DebugNameToString(indexBufferDesc.debugName) << " whose size is " << indexBufferDesc.byteSize
                                 << ", which will result in a buffer overrun";
                             error(ss.str());
-                            return;
+                            return false;
                         }
 
                         if ((triangles.indexCount % 3) != 0)
@@ -1398,7 +1393,7 @@ namespace nvrhi::validation
                                 << " has indexCount = " << triangles.indexCount
                                 << ", which is not a multiple of 3";
                             error(ss.str());
-                            return;
+                            return false;
                         }
                     }
                     else
@@ -1409,7 +1404,7 @@ namespace nvrhi::validation
                             ss << "BLAS " << utils::DebugNameToString(as->getDesc().debugName) << " build geometry " << i
                                 << " has indexFormat = UNKNOWN but nonzero indexCount = " << triangles.indexCount;
                             error(ss.str());
-                            return;
+                            return false;
                         }
 
                         if (triangles.indexBuffer != nullptr)
@@ -1419,7 +1414,7 @@ namespace nvrhi::validation
                                 << " has indexFormat = UNKNOWN but non-NULL indexBuffer = "
                                 << utils::DebugNameToString(triangles.indexBuffer->getDesc().debugName);
                             error(ss.str());
-                            return;
+                            return false;
                         }
                     }
 
@@ -1445,7 +1440,7 @@ namespace nvrhi::validation
                         ss << "BLAS " << utils::DebugNameToString(as->getDesc().debugName) << " build geometry " << i
                             << " has unsupported vertex format: " << utils::FormatToString(triangles.vertexFormat);
                         error(ss.str());
-                        return;
+                        return false;
                     }
                     }
 
@@ -1455,7 +1450,7 @@ namespace nvrhi::validation
                         ss << "BLAS " << utils::DebugNameToString(as->getDesc().debugName) << " build geometry " << i
                             << " has NULL vertex buffer";
                         error(ss.str());
-                        return;
+                        return false;
                     }
 
                     if (triangles.vertexStride == 0)
@@ -1464,7 +1459,7 @@ namespace nvrhi::validation
                         ss << "BLAS " << utils::DebugNameToString(as->getDesc().debugName) << " build geometry " << i
                             << " has vertexStride = 0";
                         error(ss.str());
-                        return;
+                        return false;
                     }
 
                     if ((triangles.indexFormat == Format::UNKNOWN) && (triangles.vertexCount % 3) != 0)
@@ -1474,7 +1469,7 @@ namespace nvrhi::validation
                             << " has indexFormat = UNKNOWN and vertexCount = " << triangles.vertexCount
                             << ", which is not a multiple of 3";
                         error(ss.str());
-                        return;
+                        return false;
                     }
 
                     const BufferDesc& vertexBufferDesc = triangles.vertexBuffer->getDesc();
@@ -1485,7 +1480,7 @@ namespace nvrhi::validation
                             << " has vertex buffer = " << utils::DebugNameToString(vertexBufferDesc.debugName)
                             << " which does not have the isAccelStructBuildInput flag set";
                         error(ss.str());
-                        return;
+                        return false;
                     }
 
                     const size_t vertexDataSize = triangles.vertexCount * triangles.vertexStride;
@@ -1497,7 +1492,7 @@ namespace nvrhi::validation
                             << " in buffer " << utils::DebugNameToString(vertexBufferDesc.debugName) << " whose size is " << vertexBufferDesc.byteSize
                             << ", which will result in a buffer overrun";
                         error(ss.str());
-                        return;
+                        return false;
                     }
                 }
                 else if (geom.geometryType == rt::GeometryType::AABBs)
@@ -1510,7 +1505,7 @@ namespace nvrhi::validation
                         ss << "BLAS " << utils::DebugNameToString(as->getDesc().debugName) << " build geometry " << i
                             << " has NULL AABB data buffer";
                         error(ss.str());
-                        return;
+                        return false;
                     }
 
                     const BufferDesc& aabbBufferDesc = aabbs.buffer->getDesc();
@@ -1521,7 +1516,7 @@ namespace nvrhi::validation
                             << " has AABB data buffer = " << utils::DebugNameToString(aabbBufferDesc.debugName)
                             << " which does not have the isAccelStructBuildInput flag set";
                         error(ss.str());
-                        return;
+                        return false;
                     }
 
                     if (aabbs.count > 1 && aabbs.stride < sizeof(rt::GeometryAABB))
@@ -1531,7 +1526,7 @@ namespace nvrhi::validation
                             << " has AABB stride = " << aabbs.stride
                             << " which is less than the size of one AABB (" << sizeof(rt::GeometryAABB) << " bytes)";
                         error(ss.str());
-                        return;
+                        return false;
                     }
 
                     const size_t aabbDataSize = aabbs.count * aabbs.stride;
@@ -1543,7 +1538,7 @@ namespace nvrhi::validation
                             << " in buffer " << utils::DebugNameToString(aabbBufferDesc.debugName) << " whose size is " << aabbBufferDesc.byteSize
                             << ", which will result in a buffer overrun";
                         error(ss.str());
-                        return;
+                        return false;
                     }
 
                     if (geom.useTransform)
@@ -1565,7 +1560,7 @@ namespace nvrhi::validation
                         ss << "BLAS " << utils::DebugNameToString(as->getDesc().debugName) << " build geometry " << i
                             << " has NULL vertex buffer";
                         error(ss.str());
-                        return;
+                        return false;
                     }
 
                     // TODO: Add more validation
@@ -1580,7 +1575,7 @@ namespace nvrhi::validation
                         ss << "BLAS " << utils::DebugNameToString(as->getDesc().debugName) << " build geometry " << i
                             << " has NULL vertex buffer";
                         error(ss.str());
-                        return;
+                        return false;
                     }
 
                     // TODO: Add more validation
@@ -1595,7 +1590,7 @@ namespace nvrhi::validation
                     ss << "Cannot perform an update on BLAS " << utils::DebugNameToString(as->getDesc().debugName)
                         << " that was not created with the AllowUpdate flag";
                     error(ss.str());
-                    return;
+                    return false;
                 }
 
                 if (!wrapper->wasBuilt)
@@ -1604,7 +1599,7 @@ namespace nvrhi::validation
                     ss << "Cannot perform an update on BLAS " << utils::DebugNameToString(as->getDesc().debugName)
                         << " before the same BLAS was initially built";
                     error(ss.str());
-                    return;
+                    return false;
                 }
 
                 if (numGeometries != wrapper->buildGeometries.size())
@@ -1614,7 +1609,7 @@ namespace nvrhi::validation
                         << " with " << numGeometries << " geometries "
                         "when this BLAS was built with " << wrapper->buildGeometries.size() << " geometries";
                     error(ss.str());
-                    return;
+                    return false;
                 }
                 
                 for (size_t i = 0; i < numGeometries; i++)
@@ -1628,7 +1623,7 @@ namespace nvrhi::validation
                         ss << "Cannot perform an update on BLAS " << utils::DebugNameToString(as->getDesc().debugName)
                             << " with mismatching geometry types in slot " << i;
                         error(ss.str());
-                        return;
+                        return false;
                     }
 
                     if (before.geometryType == rt::GeometryType::Triangles)
@@ -1651,7 +1646,7 @@ namespace nvrhi::validation
                                 << " with mismatching triangle counts in geometry slot " << i << ": "
                                 "built with " << primitivesBefore << " triangles, updating with " << primitivesAfter << " triangles";
                             error(ss.str());
-                            return;
+                            return false;
                         }
                     }
                     else // AABBs
@@ -1666,7 +1661,7 @@ namespace nvrhi::validation
                                 << " with mismatching AABB counts in geometry slot " << i << ": "
                                 "built with " << aabbsBefore << " AABBs, updating with " << aabbsAfter << " AABBs";
                             error(ss.str());
-                            return;
+                            return false;
                         }
                     }
                 }
@@ -1678,14 +1673,69 @@ namespace nvrhi::validation
                 ss << "Cannot rebuild BLAS " << utils::DebugNameToString(as->getDesc().debugName)
                     << " that has the AllowCompaction flag set";
                 error(ss.str());
-                return;
+                return false;
             }
 
             wrapper->wasBuilt = true;
             wrapper->buildGeometries.assign(pGeometries, pGeometries + numGeometries);
         }
 
+        outUnderlyingAS = underlyingAS;
+        return true;
+    }
+
+    void CommandListWrapper::buildBottomLevelAccelStruct(rt::IAccelStruct* as, const rt::GeometryDesc* pGeometries, size_t numGeometries, rt::AccelStructBuildFlags buildFlags)
+    {
+        if (!requireOpenState())
+            return;
+
+        if (!requireType(CommandQueue::Compute, "buildBottomLevelAccelStruct"))
+            return;
+
+        rt::IAccelStruct* underlyingAS = nullptr;
+        if (!validateBuildBottomLevelAccelStruct(as, pGeometries, numGeometries, buildFlags, underlyingAS))
+            return;
+
         m_CommandList->buildBottomLevelAccelStruct(underlyingAS, pGeometries, numGeometries, buildFlags);
+    }
+
+    void CommandListWrapper::buildBottomLevelAccelStructs(const rt::BottomLevelAccelStructBuild* pBuilds, size_t numBuilds)
+    {
+        if (!requireOpenState())
+            return;
+
+        if (!requireType(CommandQueue::Compute, "buildBottomLevelAccelStructs"))
+            return;
+
+        std::vector<rt::BottomLevelAccelStructBuild> underlyingBuilds;
+        underlyingBuilds.reserve(numBuilds);
+
+        for (size_t i = 0; i < numBuilds; i++)
+        {
+            const rt::BottomLevelAccelStructBuild& build = pBuilds[i];
+
+            for (size_t j = 0; j < i; j++)
+            {
+                if (pBuilds[j].accelStruct == build.accelStruct)
+                {
+                    std::stringstream ss;
+                    ss << "BLAS " << utils::DebugNameToString(build.accelStruct->getDesc().debugName)
+                        << " appears more than once in a buildBottomLevelAccelStructs batch";
+                    error(ss.str());
+                    return;
+                }
+            }
+
+            rt::IAccelStruct* underlyingAS = nullptr;
+            if (!validateBuildBottomLevelAccelStruct(build.accelStruct, build.geometries, build.numGeometries, build.buildFlags, underlyingAS))
+                return;
+
+            rt::BottomLevelAccelStructBuild underlying = build;
+            underlying.accelStruct = underlyingAS;
+            underlyingBuilds.push_back(underlying);
+        }
+
+        m_CommandList->buildBottomLevelAccelStructs(underlyingBuilds.data(), underlyingBuilds.size());
     }
 
     bool CommandListWrapper::validateBuildTopLevelAccelStruct(AccelStructWrapper* wrapper, size_t numInstances, rt::AccelStructBuildFlags buildFlags) const

@@ -873,200 +873,286 @@ namespace nvrhi::vulkan
         m_CurrentCmdBuf->cmdBuf.buildMicromapsEXT(1, &buildInfo);
     }
 
-    void CommandList::buildBottomLevelAccelStruct(rt::IAccelStruct* _as, const rt::GeometryDesc* pGeometries, size_t numGeometries, rt::AccelStructBuildFlags buildFlags)
+    namespace
     {
-        AccelStruct* as = checked_cast<AccelStruct*>(_as);
-
-        const bool performUpdate = (buildFlags & rt::AccelStructBuildFlags::PerformUpdate) != 0;
-        if (performUpdate)
+        // Vulkan build inputs for one BLAS of a batch. The build info points into the vectors below,
+        // so an instance must not be moved or copied after it has been filled.
+        struct BottomLevelBuildData
         {
-            assert(as->allowUpdate);
-        }
+            AccelStruct* as = nullptr;
+            bool performUpdate = false;
+            bool valid = false;
+            std::vector<vk::AccelerationStructureGeometryKHR> geometries;
+            std::vector<vk::AccelerationStructureTrianglesOpacityMicromapEXT> omms;
+            std::vector<vk::AccelerationStructureGeometryLinearSweptSpheresDataNV> lss;
+            std::vector<vk::AccelerationStructureBuildRangeInfoKHR> buildRanges;
+            std::vector<uint32_t> maxPrimitiveCounts;
+            vk::AccelerationStructureBuildGeometryInfoKHR buildInfo;
+        };
+    }
 
-        std::vector<vk::AccelerationStructureGeometryKHR> geometries;
-        std::vector<vk::AccelerationStructureTrianglesOpacityMicromapEXT> omms;
-        std::vector<vk::AccelerationStructureGeometryLinearSweptSpheresDataNV> lss;
-        std::vector<vk::AccelerationStructureBuildRangeInfoKHR> buildRanges;
-        std::vector<uint32_t> maxPrimitiveCounts;
-        geometries.resize(numGeometries);
-        omms.resize(numGeometries);
-        lss.resize(numGeometries);
-        maxPrimitiveCounts.resize(numGeometries);
-        buildRanges.resize(numGeometries);
+    void CommandList::buildBottomLevelAccelStruct(rt::IAccelStruct* as, const rt::GeometryDesc* pGeometries, size_t numGeometries, rt::AccelStructBuildFlags buildFlags)
+    {
+        rt::BottomLevelAccelStructBuild build;
+        build.accelStruct = as;
+        build.geometries = pGeometries;
+        build.numGeometries = numGeometries;
+        build.buildFlags = buildFlags;
+        buildBottomLevelAccelStructs(&build, 1);
+    }
+
+    void CommandList::buildBottomLevelAccelStructs(const rt::BottomLevelAccelStructBuild* pBuilds, size_t numBuilds)
+    {
+        if (numBuilds == 0)
+            return;
 
         uint64_t currentVersion = MakeVersion(m_CurrentCmdBuf->recordingID, m_CommandListParameters.queueType, false);
 
-        for (size_t i = 0; i < numGeometries; i++)
+        // Sized once up front: each entry's build info points into its own vectors.
+        std::vector<BottomLevelBuildData> builds(numBuilds);
+
+        // Pass 1: convert geometries and request every input buffer state, so the barriers for the
+        // whole batch are committed together instead of once per BLAS.
+        for (size_t b = 0; b < numBuilds; b++)
         {
-            convertBottomLevelGeometry(pGeometries[i], geometries[i], omms[i], lss[i], maxPrimitiveCounts[i], &buildRanges[i],
-                m_Context, m_UploadManager.get(), currentVersion);
+            const rt::BottomLevelAccelStructBuild& desc = pBuilds[b];
+            BottomLevelBuildData& data = builds[b];
 
-            const rt::GeometryDesc& src = pGeometries[i];
-
-            switch (src.geometryType)
+            AccelStruct* as = checked_cast<AccelStruct*>(desc.accelStruct);
+            data.as = as;
+            data.performUpdate = (desc.buildFlags & rt::AccelStructBuildFlags::PerformUpdate) != 0;
+            if (data.performUpdate)
             {
-            case rt::GeometryType::Triangles: {
-                const rt::GeometryTriangles& srct = src.geometryData.triangles;
-                if (srct.indexBuffer)
-                    m_CurrentCmdBuf->referencedResources.push_back(srct.indexBuffer);
-                if (srct.vertexBuffer)
-                    m_CurrentCmdBuf->referencedResources.push_back(srct.vertexBuffer);
-                if (OpacityMicromap* om = checked_cast<OpacityMicromap*>(srct.opacityMicromap))
-                    m_CurrentCmdBuf->referencedResources.push_back(om->dataBuffer);
-                if (src.transformBuffer)
-                    m_CurrentCmdBuf->referencedResources.push_back(src.transformBuffer);
+                assert(as->allowUpdate);
+            }
 
-                if (m_EnableAutomaticBarriers)
+            const size_t numGeometries = desc.numGeometries;
+            const rt::GeometryDesc* pGeometries = desc.geometries;
+
+            data.geometries.resize(numGeometries);
+            data.omms.resize(numGeometries);
+            data.lss.resize(numGeometries);
+            data.maxPrimitiveCounts.resize(numGeometries);
+            data.buildRanges.resize(numGeometries);
+
+            for (size_t i = 0; i < numGeometries; i++)
+            {
+                convertBottomLevelGeometry(pGeometries[i], data.geometries[i], data.omms[i], data.lss[i], data.maxPrimitiveCounts[i], &data.buildRanges[i],
+                    m_Context, m_UploadManager.get(), currentVersion);
+
+                const rt::GeometryDesc& src = pGeometries[i];
+
+                switch (src.geometryType)
                 {
+                case rt::GeometryType::Triangles: {
+                    const rt::GeometryTriangles& srct = src.geometryData.triangles;
                     if (srct.indexBuffer)
-                        requireBufferState(srct.indexBuffer, nvrhi::ResourceStates::AccelStructBuildInput);
+                        m_CurrentCmdBuf->referencedResources.push_back(srct.indexBuffer);
                     if (srct.vertexBuffer)
-                        requireBufferState(srct.vertexBuffer, nvrhi::ResourceStates::AccelStructBuildInput);
+                        m_CurrentCmdBuf->referencedResources.push_back(srct.vertexBuffer);
                     if (OpacityMicromap* om = checked_cast<OpacityMicromap*>(srct.opacityMicromap))
-                        requireBufferState(om->dataBuffer, nvrhi::ResourceStates::AccelStructBuildInput);
+                        m_CurrentCmdBuf->referencedResources.push_back(om->dataBuffer);
                     if (src.transformBuffer)
-                        requireBufferState(src.transformBuffer, nvrhi::ResourceStates::AccelStructBuildInput);
+                        m_CurrentCmdBuf->referencedResources.push_back(src.transformBuffer);
+
+                    if (m_EnableAutomaticBarriers)
+                    {
+                        if (srct.indexBuffer)
+                            requireBufferState(srct.indexBuffer, nvrhi::ResourceStates::AccelStructBuildInput);
+                        if (srct.vertexBuffer)
+                            requireBufferState(srct.vertexBuffer, nvrhi::ResourceStates::AccelStructBuildInput);
+                        if (OpacityMicromap* om = checked_cast<OpacityMicromap*>(srct.opacityMicromap))
+                            requireBufferState(om->dataBuffer, nvrhi::ResourceStates::AccelStructBuildInput);
+                        if (src.transformBuffer)
+                            requireBufferState(src.transformBuffer, nvrhi::ResourceStates::AccelStructBuildInput);
+                    }
+                    break;
                 }
-                break;
-            }
-            case rt::GeometryType::AABBs: {
-                const rt::GeometryAABBs& srca = src.geometryData.aabbs;
-                if (srca.buffer)
-                    m_CurrentCmdBuf->referencedResources.push_back(srca.buffer);
-                if (m_EnableAutomaticBarriers)
-                {
+                case rt::GeometryType::AABBs: {
+                    const rt::GeometryAABBs& srca = src.geometryData.aabbs;
                     if (srca.buffer)
-                        requireBufferState(srca.buffer, nvrhi::ResourceStates::AccelStructBuildInput);
+                        m_CurrentCmdBuf->referencedResources.push_back(srca.buffer);
+                    if (m_EnableAutomaticBarriers)
+                    {
+                        if (srca.buffer)
+                            requireBufferState(srca.buffer, nvrhi::ResourceStates::AccelStructBuildInput);
+                    }
+                    break;
                 }
-                break;
-            }
-            case rt::GeometryType::Spheres:
-                utils::NotImplemented();
-                break;
-            case rt::GeometryType::Lss: {
-                const rt::GeometryLss& srcLss = src.geometryData.lss;
-                if (srcLss.indexBuffer)
-                    m_CurrentCmdBuf->referencedResources.push_back(srcLss.indexBuffer);
-                if (srcLss.vertexBuffer)
-                    m_CurrentCmdBuf->referencedResources.push_back(srcLss.vertexBuffer);
-                if (m_EnableAutomaticBarriers)
-                {
+                case rt::GeometryType::Spheres:
+                    utils::NotImplemented();
+                    break;
+                case rt::GeometryType::Lss: {
+                    const rt::GeometryLss& srcLss = src.geometryData.lss;
                     if (srcLss.indexBuffer)
-                        requireBufferState(srcLss.indexBuffer, nvrhi::ResourceStates::AccelStructBuildInput);
+                        m_CurrentCmdBuf->referencedResources.push_back(srcLss.indexBuffer);
                     if (srcLss.vertexBuffer)
-                        requireBufferState(srcLss.vertexBuffer, nvrhi::ResourceStates::AccelStructBuildInput);
+                        m_CurrentCmdBuf->referencedResources.push_back(srcLss.vertexBuffer);
+                    if (m_EnableAutomaticBarriers)
+                    {
+                        if (srcLss.indexBuffer)
+                            requireBufferState(srcLss.indexBuffer, nvrhi::ResourceStates::AccelStructBuildInput);
+                        if (srcLss.vertexBuffer)
+                            requireBufferState(srcLss.vertexBuffer, nvrhi::ResourceStates::AccelStructBuildInput);
+                    }
+                    break;
                 }
-                break;
+                }
             }
+
+            data.buildInfo = vk::AccelerationStructureBuildGeometryInfoKHR()
+                .setType(vk::AccelerationStructureTypeKHR::eBottomLevel)
+                .setMode(data.performUpdate ? vk::BuildAccelerationStructureModeKHR::eUpdate : vk::BuildAccelerationStructureModeKHR::eBuild)
+                .setGeometries(data.geometries)
+                .setFlags(convertAccelStructBuildFlags(desc.buildFlags))
+                .setDstAccelerationStructure(as->accelStruct);
+
+            if (as->allowUpdate)
+                data.buildInfo.flags |= vk::BuildAccelerationStructureFlagBitsKHR::eAllowUpdate;
+
+            if (data.performUpdate)
+                data.buildInfo.setSrcAccelerationStructure(as->accelStruct);
+
+#ifndef NVRHI_WITH_RTXMU
+            if (m_EnableAutomaticBarriers)
+            {
+                requireBufferState(as->dataBuffer, nvrhi::ResourceStates::AccelStructWrite);
             }
+#endif
+            data.valid = true;
         }
 
         m_BindingStatesDirty = true;
 
-        auto buildInfo = vk::AccelerationStructureBuildGeometryInfoKHR()
-            .setType(vk::AccelerationStructureTypeKHR::eBottomLevel)
-            .setMode(performUpdate ? vk::BuildAccelerationStructureModeKHR::eUpdate : vk::BuildAccelerationStructureModeKHR::eBuild)
-            .setGeometries(geometries)
-            .setFlags(convertAccelStructBuildFlags(buildFlags))
-            .setDstAccelerationStructure(as->accelStruct);
-
-        if (as->allowUpdate)
-            buildInfo.flags |= vk::BuildAccelerationStructureFlagBitsKHR::eAllowUpdate;
-
-        if (performUpdate)
-            buildInfo.setSrcAccelerationStructure(as->accelStruct);
-        
-#ifdef NVRHI_WITH_RTXMU
         commitBarriers();
 
-        std::array<vk::AccelerationStructureBuildGeometryInfoKHR, 1> buildInfos = { buildInfo };
-        std::array<const vk::AccelerationStructureBuildRangeInfoKHR*, 1> buildRangeArrays = { buildRanges.data() };
-        std::array<const uint32_t*, 1> maxPrimArrays = { maxPrimitiveCounts.data() };
+#ifdef NVRHI_WITH_RTXMU
+        // RTXMU records one vkCmdBuildAccelerationStructuresKHR per call, so split the batch into
+        // BLASes it has not seen yet and BLASes it already manages (updates and rebuilds).
+        std::vector<vk::AccelerationStructureBuildGeometryInfoKHR> newInfos, existingInfos;
+        std::vector<const vk::AccelerationStructureBuildRangeInfoKHR*> newRanges, existingRanges;
+        std::vector<const uint32_t*> newMaxPrims, existingMaxPrims;
+        std::vector<AccelStruct*> newAccelStructs;
+        std::vector<uint64_t> existingIds;
 
-        if(as->rtxmuId == ~0ull)
+        for (BottomLevelBuildData& data : builds)
+        {
+            if (data.as->rtxmuId == ~0ull)
+            {
+                newInfos.push_back(data.buildInfo);
+                newRanges.push_back(data.buildRanges.data());
+                newMaxPrims.push_back(data.maxPrimitiveCounts.data());
+                newAccelStructs.push_back(data.as);
+            }
+            else
+            {
+                existingInfos.push_back(data.buildInfo);
+                existingRanges.push_back(data.buildRanges.data());
+                existingMaxPrims.push_back(data.maxPrimitiveCounts.data());
+                existingIds.push_back(data.as->rtxmuId);
+            }
+        }
+
+        if (!newInfos.empty())
         {
             std::vector<uint64_t> accelStructsToBuild;
             m_Context.rtxMemUtil->PopulateBuildCommandList(m_CurrentCmdBuf->cmdBuf,
-                                                           buildInfos.data(),
-                                                           buildRangeArrays.data(),
-                                                           maxPrimArrays.data(),
-                                                           (uint32_t)buildInfos.size(),
+                                                           newInfos.data(),
+                                                           newRanges.data(),
+                                                           newMaxPrims.data(),
+                                                           (uint32_t)newInfos.size(),
                                                            accelStructsToBuild);
 
+            // RTXMU returns the IDs in input order.
+            for (size_t i = 0; i < newAccelStructs.size(); i++)
+            {
+                AccelStruct* as = newAccelStructs[i];
+                as->rtxmuId = accelStructsToBuild[i];
 
-            as->rtxmuId = accelStructsToBuild[0];
-            
-            as->rtxmuBuffer = m_Context.rtxMemUtil->GetBuffer(as->rtxmuId);
-            as->accelStruct = m_Context.rtxMemUtil->GetAccelerationStruct(as->rtxmuId);
-            as->accelStructDeviceAddress = m_Context.rtxMemUtil->GetDeviceAddress(as->rtxmuId);
+                as->rtxmuBuffer = m_Context.rtxMemUtil->GetBuffer(as->rtxmuId);
+                as->accelStruct = m_Context.rtxMemUtil->GetAccelerationStruct(as->rtxmuId);
+                as->accelStructDeviceAddress = m_Context.rtxMemUtil->GetDeviceAddress(as->rtxmuId);
 
-            m_CurrentCmdBuf->rtxmuBuildIds.push_back(as->rtxmuId);
+                m_CurrentCmdBuf->rtxmuBuildIds.push_back(as->rtxmuId);
+            }
         }
-        else
-        {
-            std::vector<uint64_t> buildsToUpdate(1, as->rtxmuId);
 
+        if (!existingInfos.empty())
+        {
             m_Context.rtxMemUtil->PopulateUpdateCommandList(m_CurrentCmdBuf->cmdBuf,
-                                                            buildInfos.data(),
-                                                            buildRangeArrays.data(),
-                                                            maxPrimArrays.data(),
-                                                            (uint32_t)buildInfos.size(),
-                                                            buildsToUpdate);
+                                                            existingInfos.data(),
+                                                            existingRanges.data(),
+                                                            existingMaxPrims.data(),
+                                                            (uint32_t)existingInfos.size(),
+                                                            existingIds);
         }
 #else
+        std::vector<vk::AccelerationStructureBuildGeometryInfoKHR> buildInfos;
+        std::vector<const vk::AccelerationStructureBuildRangeInfoKHR*> buildRangeArrays;
+        buildInfos.reserve(numBuilds);
+        buildRangeArrays.reserve(numBuilds);
 
-        if (m_EnableAutomaticBarriers)
+        for (BottomLevelBuildData& data : builds)
         {
-            requireBufferState(as->dataBuffer, nvrhi::ResourceStates::AccelStructWrite);
+            AccelStruct* as = data.as;
+
+            auto buildSizes = m_Context.device.getAccelerationStructureBuildSizesKHR(
+                vk::AccelerationStructureBuildTypeKHR::eDevice, data.buildInfo, data.maxPrimitiveCounts);
+
+            if (buildSizes.accelerationStructureSize > as->dataBuffer->getDesc().byteSize)
+            {
+                std::stringstream ss;
+                ss << "BLAS " << utils::DebugNameToString(as->desc.debugName) << " build requires at least "
+                    << buildSizes.accelerationStructureSize << " bytes in the data buffer, while the allocated buffer is only "
+                    << as->dataBuffer->getDesc().byteSize << " bytes";
+
+                m_Context.error(ss.str());
+                data.valid = false;
+                continue;
+            }
+
+            size_t scratchSize = data.performUpdate
+                ? buildSizes.updateScratchSize
+                : buildSizes.buildScratchSize;
+
+            Buffer* scratchBuffer = nullptr;
+            uint64_t scratchOffset = 0;
+
+            // Each build gets its own scratch range, so builds recorded in one call never overlap.
+            bool allocated = m_ScratchManager->suballocateBuffer(scratchSize, &scratchBuffer, &scratchOffset, nullptr,
+                currentVersion, m_Context.accelStructProperties.minAccelerationStructureScratchOffsetAlignment);
+
+            if (!allocated)
+            {
+                std::stringstream ss;
+                ss << "Couldn't suballocate a scratch buffer for BLAS " << utils::DebugNameToString(as->desc.debugName) << " build. "
+                    "The build requires " << scratchSize << " bytes of scratch space.";
+
+                m_Context.error(ss.str());
+                data.valid = false;
+                continue;
+            }
+
+            assert(scratchBuffer->deviceAddress);
+            data.buildInfo.setScratchData(scratchBuffer->deviceAddress + scratchOffset);
+
+            buildInfos.push_back(data.buildInfo);
+            buildRangeArrays.push_back(data.buildRanges.data());
         }
-        commitBarriers();
 
-        auto buildSizes = m_Context.device.getAccelerationStructureBuildSizesKHR(
-            vk::AccelerationStructureBuildTypeKHR::eDevice, buildInfo, maxPrimitiveCounts);
-
-        if (buildSizes.accelerationStructureSize > as->dataBuffer->getDesc().byteSize)
-        {
-            std::stringstream ss;
-            ss << "BLAS " << utils::DebugNameToString(as->desc.debugName) << " build requires at least "
-                << buildSizes.accelerationStructureSize << " bytes in the data buffer, while the allocated buffer is only "
-                << as->dataBuffer->getDesc().byteSize << " bytes";
-
-            m_Context.error(ss.str());
-            return;
-        }
-
-        size_t scratchSize = performUpdate
-            ? buildSizes.updateScratchSize
-            : buildSizes.buildScratchSize;
-
-        Buffer* scratchBuffer = nullptr;
-        uint64_t scratchOffset = 0;
-
-        bool allocated = m_ScratchManager->suballocateBuffer(scratchSize, &scratchBuffer, &scratchOffset, nullptr,
-            currentVersion, m_Context.accelStructProperties.minAccelerationStructureScratchOffsetAlignment);
-
-        if (!allocated)
-        {
-            std::stringstream ss;
-            ss << "Couldn't suballocate a scratch buffer for BLAS " << utils::DebugNameToString(as->desc.debugName) << " build. "
-                "The build requires " << scratchSize << " bytes of scratch space.";
-
-            m_Context.error(ss.str());
-            return;
-        }
-        
-        assert(scratchBuffer->deviceAddress);
-        buildInfo.setScratchData(scratchBuffer->deviceAddress + scratchOffset);
-
-        std::array<vk::AccelerationStructureBuildGeometryInfoKHR, 1> buildInfos = { buildInfo };
-        std::array<const vk::AccelerationStructureBuildRangeInfoKHR*, 1> buildRangeArrays = { buildRanges.data() };
-
-        m_CurrentCmdBuf->cmdBuf.buildAccelerationStructuresKHR(buildInfos, buildRangeArrays);
+        if (!buildInfos.empty())
+            m_CurrentCmdBuf->cmdBuf.buildAccelerationStructuresKHR(buildInfos, buildRangeArrays);
 #endif
-        if (as->dataBuffer)
-            m_CurrentCmdBuf->referencedResources.push_back(as->dataBuffer);
-        if (as->desc.trackLiveness)
-            m_CurrentCmdBuf->referencedResources.push_back(as);
+
+        for (const BottomLevelBuildData& data : builds)
+        {
+            if (!data.valid)
+                continue;
+            if (data.as->dataBuffer)
+                m_CurrentCmdBuf->referencedResources.push_back(data.as->dataBuffer);
+            if (data.as->desc.trackLiveness)
+                m_CurrentCmdBuf->referencedResources.push_back(data.as);
+        }
     }
 
     void CommandList::compactBottomLevelAccelStructs()

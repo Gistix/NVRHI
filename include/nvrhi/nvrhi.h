@@ -1854,6 +1854,16 @@ namespace nvrhi
 
         typedef RefCountPtr<IAccelStruct> AccelStructHandle;
 
+        // One BLAS build or update in a batch passed to ICommandList::buildBottomLevelAccelStructs.
+        // The geometry array must stay valid for the duration of that call.
+        struct BottomLevelAccelStructBuild
+        {
+            IAccelStruct* accelStruct = nullptr;
+            const GeometryDesc* geometries = nullptr;
+            size_t numGeometries = 0;
+            AccelStructBuildFlags buildFlags = AccelStructBuildFlags::None;
+        };
+
 
         //////////////////////////////////////////////////////////////////////////
         // Clusters
@@ -3675,6 +3685,19 @@ namespace nvrhi
         // Note that RTXMU currently doesn't support OMM or LSS.
         virtual void buildBottomLevelAccelStruct(rt::IAccelStruct* as, const rt::GeometryDesc* pGeometries,
             size_t numGeometries, rt::AccelStructBuildFlags buildFlags = rt::AccelStructBuildFlags::None) = 0;
+
+        // Builds or updates several independent BLASes, with the same semantics as calling
+        // buildBottomLevelAccelStruct for each entry. Each BLAS may appear at most once per batch.
+        // Backends can resolve all input barriers once and record the builds together so the GPU can
+        // overlap them:
+        // - Vulkan: one barrier commit, then a single vkCmdBuildAccelerationStructuresKHR
+        //   (with RTXMU: one call for new BLASes and one for updates/rebuilds).
+        // - Other backends: falls back to one buildBottomLevelAccelStruct call per entry.
+        virtual void buildBottomLevelAccelStructs(const rt::BottomLevelAccelStructBuild* pBuilds, size_t numBuilds)
+        {
+            for (size_t i = 0; i < numBuilds; i++)
+                buildBottomLevelAccelStruct(pBuilds[i].accelStruct, pBuilds[i].geometries, pBuilds[i].numGeometries, pBuilds[i].buildFlags);
+        }
         
         // Compacts all bottom-level ray tracing acceleration structures (BLASes) that are currently available
         // for compaction. This process is handled by the RTXMU library. If NVRHI is built without RTXMU,
